@@ -7,7 +7,8 @@ import openpyxl
 from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_efm_efficiency
 from mod_sbml.utils.misc import invert_map
 from mod_cobra.constraint_based_analysis.efm.EFM import EFM
-from mod_sbml.sbml.sbml_manager import get_r_comps, get_kegg_r_id
+from mod_sbml.sbml.sbml_manager import get_r_comps
+from mod_sbml.annotation.kegg.kegg_annotator import get_kegg_r_id
 from mod_sbml.sbml.submodel_manager import submodel
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 from mod_sbml.serialization.xlsx_helper import BASIC_STYLE, save_data
