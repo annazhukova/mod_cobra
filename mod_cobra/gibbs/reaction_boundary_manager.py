@@ -2,10 +2,9 @@ from decimal import Decimal
 import logging
 
 from mod_cobra.gibbs.gibbs_manager import get_r_kegg2equilibrium_const, get_c_kegg2g0, get_g0_equilibrium_const
-from mod_sbml.kegg.reaction_manager import get_rn2compounds
-from mod_sbml.sbml.sbml_manager import get_kegg_r_id, get_reactants, get_products, get_kegg_m_id
-
-KEGG_PROTON = 'C00080'
+from mod_sbml.annotation.kegg.reaction_manager import get_rn2compounds
+from mod_sbml.annotation.kegg.kegg_annotator import get_kegg_r_id, get_kegg_m_id, KEGG_PROTON
+from mod_sbml.sbml.sbml_manager import get_reactants, get_products
 
 __author__ = 'anna'
 

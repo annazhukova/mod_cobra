@@ -30,5 +30,6 @@ setup(name='mod_cobra',
           'Topic :: Systems Biology',
           'Topic :: Software Development',
       ],
-      install_requires=['openpyxl', 'python-libsbml-experimental', 'numpy', 'matplotlib', 'gmpy', 'cobra', 'networkx']
+      install_requires=['openpyxl', 'python-libsbml-experimental', 'numpy', 'matplotlib', 'gmpy', 'cobra', 'networkx',
+                        'mod_sbml']
 )

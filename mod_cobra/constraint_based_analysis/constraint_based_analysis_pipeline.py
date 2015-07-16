@@ -6,25 +6,26 @@ import shutil
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
 
-from cobra_constraint_based_analysis.fba_manager import serialize_fva, serialize_fluxes
-from cobra_constraint_based_analysis.model_manager import format_r_id
-from efm.clique_detection import detect_cliques
-from efm.efm_classification import classify_efms
-from efm.efm_serialization_manager import r_ids2sbml, serialize_efms_txt, serialize_efm, \
+from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_manager import serialize_fva, \
+    serialize_fluxes
+from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.model_manager import format_r_id
+from mod_cobra.constraint_based_analysis.efm.clique_detection import detect_cliques
+from mod_cobra.constraint_based_analysis.efm.efm_classification import classify_efms
+from mod_cobra.constraint_based_analysis.efm.efm_serialization_manager import r_ids2sbml, serialize_efms_txt, serialize_efm, \
     serialize_important_reactions, get_pattern_sorter, serialize_patterns, serialize_pattern, \
     serialize_cliques, serialize_clique
-from efm.reaction_classification_by_efm import get_important_reactions
+from mod_cobra.constraint_based_analysis.efm.reaction_classification_by_efm import get_important_reactions
 from mod_cobra.gibbs.reaction_boundary_manager import get_bounds, set_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants, reverse_reaction, get_r_comps
 from mimoza_pipeline import process_sbml
-from cobra_constraint_based_analysis.fba_analyser import analyse_by_fba, \
+from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_analyser import analyse_by_fba, \
     create_fba_model
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fva_analyser import analyse_by_fva, \
     create_fva_model, create_essential_r_ids_model
 from mod_cobra.constraint_based_analysis.efm.efm_analyser import calculate_imp_rn_threshold, get_efms, \
     calculate_min_pattern_len, calculate_min_clique_len
 from mod_sbml.utils.path_manager import create_dirs
-from serialization_manager import get_sbml_r_formula, serialize_model_info
+from mod_sbml.serialization.serialization_manager import get_sbml_r_formula, serialize_model_info
 from mod_sbml.sbml.ubiquitous_manager import get_cofactor_m_ids
 
 ZERO_THRESHOLD = 1e-6
