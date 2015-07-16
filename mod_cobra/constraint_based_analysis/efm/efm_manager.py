@@ -140,13 +140,13 @@ def stoichiometric_matrix(model, path):
     m_id2i = dict(zip(internal_s_ids, xrange(1, len(internal_s_ids) + 1)))
     r_id2i, rev_r_id2i = {}, {}
 
-    def add_reaction_data(file, reaction_number, reaction, rev=False):
+    def add_reaction_data(f, reaction_number, reaction, rev=False):
         for (m_id, st) in get_reactants(reaction, True):
             if m_id in m_id2i:
-                file.write("%d,%d,%d\n" % (m_id2i[m_id], reaction_number, st if rev else -st))
+                f.write("%d,%d,%d\n" % (m_id2i[m_id], reaction_number, st if rev else -st))
         for (m_id, st) in get_products(reaction, True):
             if m_id in m_id2i:
-                file.write("%d,%d,%d\n" % (m_id2i[m_id], reaction_number, -st if rev else st))
+                f.write("%d,%d,%d\n" % (m_id2i[m_id], reaction_number, -st if rev else st))
 
     i = 1
     with open(path, 'w+') as f:

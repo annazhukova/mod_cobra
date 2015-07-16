@@ -52,6 +52,7 @@ def get_biomass_dependency(model, r_id, r_ids, bm_id, max_bound=None, remove_zer
     step = max_bound / NUM_STEPS
     xs = []
 
+    old_r_id2bounds = None
     if constrained:
         r_id2bounds = get_possible_reaction_bounds(model, bm_id, r_ids - {r_id, bm_id}, reaction, xs)
         old_r_id2bounds = constraint_reactions(model, r_id2bounds)
@@ -91,7 +92,7 @@ def get_biomass_dependency(model, r_id, r_ids, bm_id, max_bound=None, remove_zer
     reaction.upper_bound = r_up_b
     reaction.lower_bound = r_l_b
 
-    if constrained:
+    if constrained and old_r_id2bounds:
         constraint_reactions(model, old_r_id2bounds)
 
     if remove_zeros:

@@ -176,8 +176,8 @@ def serialize_pattern(p_id, pattern, efm_ids, model, output_file):
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
             for r_id in sorted(r_ids):
-                f.write('%g\t%s:\t%s\n' % (coeff, r_id, get_sbml_r_formula(model, model.getReaction(r_id), comp=False,
-                                                                           id=True)))
+                f.write('%g\t%s:\t%s\n' % (coeff, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False,
+                                                                           show_metabolite_ids=True)))
             f.write('\n')
 
 
@@ -197,8 +197,8 @@ def serialize_clique(cl_id, clique, model, output_file):
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
             for r_id in sorted(r_ids):
-                f.write('%g\t%s:\t%s\n' % (coeff, r_id, get_sbml_r_formula(model, model.getReaction(r_id), comp=False,
-                                                                           id=True)))
+                f.write('%g\t%s:\t%s\n' % (coeff, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False,
+                                                                           show_metabolite_ids=True)))
             f.write('\n')
 
 
@@ -220,7 +220,7 @@ def serialize_efm(efm_id, efm, model, output_file, r_id):
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
             for r_id in sorted(r_ids):
                 f.write('%g\t%s:\t%s\n' %
-                        (coeff, r_id, get_sbml_r_formula(model, model.getReaction(r_id), comp=False, id=True)))
+                        (coeff, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False, show_metabolite_ids=True)))
             f.write('\n')
 
 

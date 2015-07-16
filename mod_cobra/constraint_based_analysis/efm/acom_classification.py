@@ -64,8 +64,8 @@ def process_clusters(dest_path, efm_id2efm, similarity_threshold, min_pattern_si
             pattern_id = int(next(re.finditer('\d+', f)).group(0))
             efm_ids = set()
             pattern = None
-            with open(os.path.join(dest_path, f), 'r') as f:
-                for line in f:
+            with open(os.path.join(dest_path, f), 'r') as fl:
+                for line in fl:
                     if line.startswith('Class'):
                         continue
                     line = line.replace('\n', '').strip()

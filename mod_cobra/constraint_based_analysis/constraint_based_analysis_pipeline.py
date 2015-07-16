@@ -94,7 +94,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
     doc = libsbml.SBMLReader().readSBML(in_sbml)
     model = doc.getModel()
     r_string = lambda r, rev: '<b>%s</b>%s: %s' % (r.getId(), ' (reversed)' if rev else '',
-                                                   get_sbml_r_formula(model, r, id=False))
+                                                   get_sbml_r_formula(model, r, show_metabolite_ids=False))
     r = model.getReaction(out_r_id)
     description = '''
         <div class="mediabox">
@@ -130,7 +130,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             fva_file = os.path.join(fva_dir, 'fva.txt')
             caption = '%s reaction %s (%s): %.4g\n==================================\n'\
                       % (objective_sense, out_r_id,
-                         get_sbml_r_formula(model, model.getReaction(out_r_id), id=True, comp=False), opt_val)
+                         get_sbml_r_formula(model, model.getReaction(out_r_id), show_metabolite_ids=True, show_compartments=False), opt_val)
             ess_rn_num, var_rn_num = serialize_fva(cobra_model, r_id2bounds, fva_file, r_ids=r_ids_of_interest,
                                                    title=caption)
             essential_r_id2rev = {r_id: u < 0 for (r_id, (l, u)) in r_id2bounds.iteritems() if l * u > 0}
@@ -168,7 +168,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             fba_file = os.path.join(fba_dir, 'fba.txt')
             caption = '%s reaction %s (%s): %.4g\n==================================\n'\
                       % (objective_sense, out_r_id,
-                         get_sbml_r_formula(model, model.getReaction(out_r_id), id=True, comp=False), opt_val)
+                         get_sbml_r_formula(model, model.getReaction(out_r_id), show_metabolite_ids=True, show_compartments=False), opt_val)
             serialize_fluxes(cobra_model, r_id2val, path=fba_file, r_ids=r_ids_of_interest, title=caption)
 
             if opt_val and sbml:
@@ -232,7 +232,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
                 mask_shift += 1
             else:
                 description += '''<p>Did not find any reactions participating in at least <b>%d</b> EFMs.</p>
-                       ''' % (imp_rn_threshold)
+                       ''' % imp_rn_threshold
             description += '</div>'
 
             avg_efm_len = sum((len(efm) for efm in id2efm.itervalues())) / len(id2efm)

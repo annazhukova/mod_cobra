@@ -26,10 +26,11 @@ setup(name='mod_cobra',
           'Environment :: Console',
           'Intended Audience :: End Users/Desktop',
           'Intended Audience :: Developers',
-          'License :: GNU GENERAL PUBLIC LICENSE',
+          'License :: CeCILL',
           'Topic :: Systems Biology',
           'Topic :: Software Development',
       ],
+      download_url='https://github.com/annazhukova/mod_cobra',
       install_requires=['openpyxl', 'python-libsbml-experimental', 'numpy', 'matplotlib', 'gmpy', 'cobra', 'networkx',
-                        'mod_sbml']
+                        'mod_sbml', 'tulip', 'geojson', 'sympy', 'jinja2', 'libsbgnpy']
 )

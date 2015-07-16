@@ -116,12 +116,12 @@ def update_boundaries(r, kegg2ke, r_id2kegg, m2kegg, kegg2rs_ps, infinity=1000):
     r_rs, r_ps = {m2kegg[m.id] for m in r.reactants if m.id in m2kegg}, {m2kegg[m.id] for m in r.products if
                                                                          m.id in m2kegg}
 
-    reversed = len(ps & r_rs) + len(rs & r_ps) > len(rs & r_rs) + len(ps & r_ps)
+    rev = len(ps & r_rs) + len(rs & r_ps) > len(rs & r_rs) + len(ps & r_ps)
 
     if (r_rs != rs or r_ps != ps) and (r_rs != ps or r_ps != rs):
-        return DIFFERENT_FORMULAS, reversed
+        return DIFFERENT_FORMULAS, rev
 
-    if reversed:
+    if rev:
         logging.info(
             "Reaction %s is defined in the opposite direction to the corresponding KEGG reaction %s" % (r.id, kegg))
 
@@ -134,7 +134,7 @@ def update_boundaries(r, kegg2ke, r_id2kegg, m2kegg, kegg2rs_ps, infinity=1000):
         # if the reaction is allowed in that direction,
         # let's keep their bound,
         # otherwise we put -infinity
-        if not reversed:
+        if not rev:
             if r.lower_bound >= 0:
                 r.lower_bound = -1000
         else:
@@ -145,25 +145,25 @@ def update_boundaries(r, kegg2ke, r_id2kegg, m2kegg, kegg2rs_ps, infinity=1000):
         # and the bound is not infinity (i.e. was manually specified),
         # let's keep their bound,
         # otherwise we update it according to Ke
-        if not reversed and (r.upper_bound <= 0 or r.upper_bound >= infinity) \
-                or reversed and (r.lower_bound >= 0 or r.lower_bound <= -infinity):
+        if not rev and (r.upper_bound <= 0 or r.upper_bound >= infinity) \
+                or rev and (r.lower_bound >= 0 or r.lower_bound <= -infinity):
             if ke < Decimal(1.0e-9):
-                if not reversed:
+                if not rev:
                     r.upper_bound = 0
                 else:
                     r.lower_bound = 0
             elif Decimal(1.0e-9) <= ke < Decimal(1.0e-5):
-                if not reversed:
+                if not rev:
                     r.upper_bound = 10
                 else:
                     r.lower_bound = -10
             elif Decimal(1.0e-5) <= ke < Decimal(1.0e-3):
-                if not reversed:
+                if not rev:
                     r.upper_bound = 100
                 else:
                     r.lower_bound = -100
             else:
-                if not reversed:
+                if not rev:
                     r.upper_bound = 1000
                 else:
                     r.lower_bound = -1000
@@ -171,7 +171,7 @@ def update_boundaries(r, kegg2ke, r_id2kegg, m2kegg, kegg2rs_ps, infinity=1000):
         # if the reaction is allowed in that direction,
         # let's keep their bound,
         # otherwise we put infinity
-        if not reversed:
+        if not rev:
             if r.upper_bound <= 0:
                 r.upper_bound = 1000
         else:
@@ -182,29 +182,29 @@ def update_boundaries(r, kegg2ke, r_id2kegg, m2kegg, kegg2rs_ps, infinity=1000):
         # and the bound is not -infinity (i.e. was manually specified),
         # let's keep their bound,
         # otherwise we update it according to Ke
-        if not reversed and (r.lower_bound >= 0 or r.lower_bound <= -infinity) \
-                or reversed and (r.upper_bound <= 0 or r.upper_bound >= infinity):
+        if not rev and (r.lower_bound >= 0 or r.lower_bound <= -infinity) \
+                or rev and (r.upper_bound <= 0 or r.upper_bound >= infinity):
             if ke >= Decimal(1.0e9):
-                if not reversed:
+                if not rev:
                     r.lower_bound = 0
                 else:
                     r.upper_bound = 0
             elif Decimal(1.0e9) > ke >= Decimal(1.0e5):
-                if not reversed:
+                if not rev:
                     r.lower_bound = -10
                 else:
                     r.upper_bound = 10
             elif Decimal(1.0e5) > ke >= Decimal(1.0e3):
-                if not reversed:
+                if not rev:
                     r.lower_bound = -100
                 else:
                     r.upper_bound = 100
             else:
-                if not reversed:
+                if not rev:
                     r.lower_bound = -1000
                 else:
                     r.upper_bound = 1000
-    return SUCCESS, reversed
+    return SUCCESS, rev
 
 
 def get_bounds(r, infinity=1000):

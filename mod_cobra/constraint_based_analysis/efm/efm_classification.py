@@ -8,17 +8,7 @@ def classify_efms(id2efm, min_pattern_len, min_efm_num=2, max_pattern_num=None):
     """
     Classifies EFMs to find common patterns.
 
-    :param efms: list of EFMs, which are represented as tuples (binary_representation, non_zero_coefficients).
-
-    A binary representation of an EFM is a list of integers whose binary representations
-    correspond to the reactions that are active in the EFM: if the reaction is active,
-    the corresponding bit is set to 1.
-    If the total number of reactions in the model is larger that the number of bits in an int, several ints are used.
-
-    Example: For a model containing reactions r1, r2(reversible), r3(reversible), r4, r5,
-    a EFM: 3 r1, -2 r2, 1 r3, 1 r5 would be represented as [77], as the binary representation of 77 is '1001101'
-    that corresponds to '1 r5, 0 r4, 0 -r3, 1 r3, 1 -r2, 0 r2, 1 r1', where -ri is the reversed version of ri.
-    The non_zero_coefficients for this EFM are [3, -2, 1, 1].
+    :param id2efm: dict {efm_id: efm}, EFMs are instances of class EFM.
 
     :param min_pattern_len: int, minimal length for a pattern to be considered.
 
@@ -30,16 +20,7 @@ def classify_efms(id2efm, min_pattern_len, min_efm_num=2, max_pattern_num=None):
 
     :return: 2 dictionaries: p_id2efm_ids and id2pattern.
     p_id2efm_ids maps a pattern_id to ids of the EFMs containing this pattern,
-    id2pattern maps a pattern_id to the binary representation of the pattern.
-
-    A binary representation of a pattern is a list of integers whose binary representations
-    correspond to the reactions that are active in this pattern: if the reaction is active,
-    the corresponding bit is set to 1.
-    If the total number of reactions in the model is larger that the number of bits in an int, several ints are used.
-
-    Example: For a model containing reactions r1, r2(reversible), r3(reversible), r4, r5,
-    a pattern: r1, r2, r3, r5 would be represented as [77], as the binary representation of 77 is '1001101'
-    that corresponds to '1 r5, 0 r4, 0 -r3, 1 r3, 1 -r2, 0 r2, 1 r1', where -ri is the reversed version of ri.
+    id2pattern maps a pattern_id to the pattern (represented as an instance of class EFM).
     """
 
     pattern2efm_ids = defaultdict(set)
