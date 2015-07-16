@@ -26,7 +26,8 @@ from mod_cobra.constraint_based_analysis.efm.efm_analyser import calculate_imp_r
     calculate_min_pattern_len, calculate_min_clique_len
 from mod_sbml.utils.path_manager import create_dirs
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula, serialize_model_info
-from mod_sbml.sbml.ubiquitous_manager import get_cofactor_m_ids
+from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
+    select_metabolite_ids_by_term_ids
 
 ZERO_THRESHOLD = 1e-6
 
@@ -35,7 +36,8 @@ __author__ = 'anna'
 
 def constraint_exchange_reactions(model, allowed_exchange_r_id2rev, cofactors=None, min_flux=0.01):
     if not cofactors:
-        cofactors = get_cofactor_m_ids(model)
+        ub_ch_ids = get_ubiquitous_chebi_ids(add_common=True, add_cofactors=True)
+        cofactors = select_metabolite_ids_by_term_ids(model, ub_ch_ids)
 
     for r in model.getListOfReactions():
         if r.id in allowed_exchange_r_id2rev:
