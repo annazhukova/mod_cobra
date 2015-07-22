@@ -32,5 +32,5 @@ setup(name='mod_cobra',
       ],
       download_url='https://github.com/annazhukova/mod_cobra',
       install_requires=['openpyxl', 'python-libsbml-experimental', 'numpy', 'matplotlib', 'gmpy', 'cobra', 'networkx',
-                        'mod_sbml', 'tulip', 'geojson', 'sympy', 'jinja2', 'libsbgnpy']
+                        'mod_sbml', 'tulip', 'geojson', 'sympy', 'jinja2', 'libsbgnpy', 'tarjan']
 )
