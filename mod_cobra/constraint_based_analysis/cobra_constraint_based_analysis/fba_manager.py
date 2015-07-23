@@ -5,6 +5,7 @@ from cobra.flux_analysis import flux_variability_analysis
 from cobra import Reaction
 from cobra.flux_analysis.parsimonious import optimize_minimal_flux
 
+from mod_cobra.constraint_based_analysis import round_value
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.model_manager import get_transport_reactions, \
     get_boundary_reactions
 from mod_sbml.serialization.plot_manager import create_plot, save_fig, create_subplot, initialise_fig
@@ -12,7 +13,6 @@ from mod_sbml.serialization.serialization_manager import get_cobra_r_formula
 
 __author__ = 'anna'
 
-ROUND_COEFFICIENT = 6
 NUM_STEPS = 20.0
 
 
@@ -37,10 +37,6 @@ def optimise_biomass(model, bm_id, objective_sense='maximize', level=logging.INF
     else:
         logging.log(level, "%s: %.4g" % (format_r_name(reaction), model.solution.f))
         return model.solution.f
-
-
-def round_value(value):
-    return round(value, ROUND_COEFFICIENT)
 
 
 def get_biomass_dependency(model, r_id, r_ids, bm_id, max_bound=None, remove_zeros=False, constrained=False,

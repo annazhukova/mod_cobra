@@ -1,12 +1,11 @@
 import logging
 
+from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.efm.efm_manager import compute_efms
 
 TREEEFM_PATH = "/home/anna/Applications/TreeEFM/tool/TreeEFMseq"
 
 __author__ = 'anna'
-
-ZERO_THRESHOLD = 1e-6
 
 
 def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_number=1000, threshold=ZERO_THRESHOLD,

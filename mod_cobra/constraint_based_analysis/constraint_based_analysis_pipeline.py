@@ -6,6 +6,7 @@ import shutil
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
 
+from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_manager import serialize_fva, \
     serialize_fluxes
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.model_manager import format_r_id
@@ -28,8 +29,6 @@ from mod_sbml.utils.path_manager import create_dirs
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula, serialize_model_info
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
-
-ZERO_THRESHOLD = 1e-6
 
 __author__ = 'anna'
 

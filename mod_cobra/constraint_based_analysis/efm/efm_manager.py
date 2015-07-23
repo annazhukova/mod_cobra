@@ -3,11 +3,10 @@ import os
 
 import libsbml
 
+from mod_cobra.constraint_based_analysis import round_value
 from mod_cobra.constraint_based_analysis.efm.EFM import get_int_size, EFM
 from mod_cobra.gibbs.reaction_boundary_manager import get_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants
-
-PRECISION = 6
 
 __author__ = 'anna'
 
@@ -72,7 +71,6 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_thres
     int_size = get_int_size()
     processed = set()
     efms = set()
-    round_value = lambda v: round(float(v), PRECISION)
     rejected_bad, rejected_different = 0, 0
     with open(out_path, 'w+') as out_f:
         with open(in_path, 'r') as in_f:
