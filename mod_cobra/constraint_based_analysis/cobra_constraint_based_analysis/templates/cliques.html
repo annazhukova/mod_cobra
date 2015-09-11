@@ -1,0 +1,13 @@
+<div class="mediabox">
+    <h3>Cliques</h3>
+    {% if clique_num %}
+        <p>Detected <b>{{clique_num}}</b> cliques of length at least <b>{{min_len}}</b>,
+            with <b>{{threshold}}</b> as min number of common EFMs for related reactions
+            (<a href="{{description_filepath}}" target="_blank">detailed description</a>).</p>
+
+        {{selected_clique_block}}
+    {% else %}
+        <p>Did not detect any cliques of length at least <b>{{min_len}}</b>,
+            with <b>{{threshold}}</b> as min number of common EFMs for related reactions.</p>
+    {% endif %}
+</div>

@@ -5,16 +5,17 @@ import shutil
 
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
+from html_descriptor import describe
+from mod_sbml.serialization.csv_manager import serialize_common_part_to_csv, serialize_model_info
 
+from graph.color.color import get_n_colors
 from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_manager import serialize_fva, \
     serialize_fluxes
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.model_manager import format_r_id
 from mod_cobra.constraint_based_analysis.efm.clique_detection import detect_cliques
-from mod_cobra.constraint_based_analysis.efm.efm_classification import classify_efms
 from mod_cobra.constraint_based_analysis.efm.efm_serialization_manager import r_ids2sbml, serialize_efms_txt, serialize_efm, \
-    serialize_important_reactions, get_pattern_sorter, serialize_patterns, serialize_pattern, \
-    serialize_cliques, serialize_clique
+    serialize_important_reactions, serialize_cliques, serialize_clique
 from mod_cobra.constraint_based_analysis.efm.reaction_classification_by_efm import get_important_reactions
 from mod_cobra.gibbs.reaction_boundary_manager import get_bounds, set_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants, reverse_reaction, get_r_comps
@@ -24,11 +25,12 @@ from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_ana
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fva_analyser import analyse_by_fva, \
     create_fva_model, create_essential_r_ids_model
 from mod_cobra.constraint_based_analysis.efm.efm_analyser import calculate_imp_rn_threshold, get_efms, \
-    calculate_min_pattern_len, calculate_min_clique_len
+    calculate_min_clique_len
 from mod_sbml.utils.path_manager import create_dirs
-from mod_sbml.serialization.serialization_manager import get_sbml_r_formula, serialize_model_info
+from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
+from model_comparison.model_merger import merge_models
 
 __author__ = 'anna'
 
@@ -67,13 +69,13 @@ def constraint_exchange_reactions(model, allowed_exchange_r_id2rev, cofactors=No
 
 
 def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=ZERO_THRESHOLD, do_fva=True,
-                  do_fba=True, do_efm=True, efms=None, max_efm_number=1000, min_pattern_len=0,
-                  imp_rn_threshold=None, ub_ch_ids=None,
-                  generalize=False, title='', r_ids_of_interest=None, cofactors=None, do_patterns=True):
+                  do_fba=True, do_efm=True, efms=None, max_efm_number=1000, imp_rn_threshold=None,
+                  cofactors=None, mask_shift=4, get_f_path=None):
     logging.info("Preparing directories...")
     # create directories to store results
     create_dirs(res_dir, False)
-    get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
+    if not get_f_path:
+        get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
 
     if in_r_id2rev:
         logging.info("Constraining input reactions...")
@@ -89,32 +91,24 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
         sbml = os.path.join(res_dir, os.path.basename(sbml))
 
     logging.info("Serializing model info...")
-    info_xlsx = os.path.join(res_dir, 'model_info.xlsx')
-    serialize_model_info(sbml, info_xlsx)
+    info_prefix = os.path.join(res_dir, 'model_info_')
+    c_csv, m_csv, r_csv = serialize_model_info(sbml, info_prefix)
     in_sbml = sbml
     doc = libsbml.SBMLReader().readSBML(in_sbml)
     model = doc.getModel()
     r_string = lambda r, rev: '<b>%s</b>%s: %s' % (r.getId(), ' (reversed)' if rev else '',
                                                    get_sbml_r_formula(model, r, show_metabolite_ids=False))
     r = model.getReaction(out_r_id)
-    description = '''
-        <div class="mediabox">
-            <h3>Input data</h3>
-            <p>The analysed model is %s (<a href="%s" download>SBML</a>, <a href="%s" download>XLSX</a>).</p>
-            <p>Objective reaction is %s.</p>
-            %s
-        </div>
-    ''' % (model.getName() if model.getName() else model.getId(),
-           os.path.join('..', os.path.relpath(in_sbml, res_dir)), os.path.join('..', os.path.relpath(info_xlsx, res_dir)),
-           r_string(r, out_rev),
-           ('<p>Input reaction%s %s.</p>'
-            % (' is' if len(in_r_id2rev) == 1 else 's are',
-               '; '.join(r_string(model.getReaction(r_id), rev)
-                         for (r_id, rev) in in_r_id2rev.iteritems()))) if in_r_id2rev else '')
+    description = describe('input_data.html', model_name=model.getName() if model.getName() else model.getId(),
+                           sbml_filepath=get_f_path(in_sbml), c_csv=get_f_path(c_csv),
+                           m_csv=get_f_path(m_csv), r_csv=get_f_path(r_csv), obj_rn=r_string(r, out_rev),
+                           in_rn_len=len(in_r_id2rev) if in_r_id2rev else 0,
+                           in_rns=
+                           '; '.join(r_string(model.getReaction(r_id), rev) for (r_id, rev) in in_r_id2rev.iteritems())
+                           if in_r_id2rev else '')
 
     id2mask = defaultdict(lambda: 0)
     layer2mask = {}
-    mask_shift = 4
 
     ess_rn_num = 0
     objective_sense = 'minimize' if out_rev else 'maximize'
@@ -131,8 +125,9 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             fva_file = os.path.join(fva_dir, 'fva.txt')
             caption = '%s reaction %s (%s): %.4g\n==================================\n'\
                       % (objective_sense, out_r_id,
-                         get_sbml_r_formula(model, model.getReaction(out_r_id), show_metabolite_ids=True, show_compartments=False), opt_val)
-            ess_rn_num, var_rn_num = serialize_fva(cobra_model, r_id2bounds, fva_file, r_ids=r_ids_of_interest,
+                         get_sbml_r_formula(model, model.getReaction(out_r_id), show_metabolite_ids=True,
+                                            show_compartments=False), opt_val)
+            ess_rn_num, var_rn_num = serialize_fva(cobra_model, r_id2bounds, fva_file,
                                                    title=caption)
             essential_r_id2rev = {r_id: u < 0 for (r_id, (l, u)) in r_id2bounds.iteritems() if l * u > 0}
             ess_r_ids = set(essential_r_id2rev.keys())
@@ -140,18 +135,12 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             mask_shift += 1
 
             if opt_val and sbml:
-                efm_sbml = os.path.join(fva_dir, 'Model_FVA.xml')
-                sbml = create_fva_model(sbml, r_id2bounds, efm_sbml)
+                fva_sbml = os.path.join(fva_dir, 'Model_FVA.xml')
+                sbml = create_fva_model(sbml, r_id2bounds, fva_sbml)
                 ess_sbml = create_essential_r_ids_model(sbml, essential_r_id2rev, fva_dir)
-                description += \
-                    '''<div class="mediabox">
-                           <h3>Flux Variability Analysis (FVA)</h3>
-                           <p>Optimal flux through the objective reaction is <b>%g</b>.</p>
-                           <p>It requires <b>%d</b> essential and <b>%d</b> variable reactions
-                           (<a href="%s" target="_blank">detailed description</a>, <a href="%s" download>SBML submodel of essential reactions</a>,
-                           <a href="%s" download>SBML submodel of essential and variable reactions</a>).</p>
-                       </div>
-                    ''' % (opt_val, ess_rn_num, var_rn_num, get_f_path(fva_file), get_f_path(ess_sbml), get_f_path(efm_sbml))
+                description += describe('fva.html', optimal_value=opt_val, ess_r_num=ess_rn_num, var_r_num=var_rn_num,
+                                        description_filepath=get_f_path(fva_file), sbml_filepath=get_f_path(fva_sbml),
+                                        ess_sbml_filepath=get_f_path(ess_sbml))
 
     if do_fba:
         logging.info("Performing FBA...")
@@ -169,20 +158,15 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             fba_file = os.path.join(fba_dir, 'fba.txt')
             caption = '%s reaction %s (%s): %.4g\n==================================\n'\
                       % (objective_sense, out_r_id,
-                         get_sbml_r_formula(model, model.getReaction(out_r_id), show_metabolite_ids=True, show_compartments=False), opt_val)
-            serialize_fluxes(cobra_model, r_id2val, path=fba_file, r_ids=r_ids_of_interest, title=caption)
+                         get_sbml_r_formula(model, model.getReaction(out_r_id), show_metabolite_ids=True,
+                                            show_compartments=False), opt_val)
+            serialize_fluxes(cobra_model, r_id2val, path=fba_file, title=caption)
 
             if opt_val and sbml:
                 efm_sbml = os.path.join(fba_dir, 'Model_FBA.xml')
                 create_fba_model(sbml, r_id2val, efm_sbml)
-                description += \
-                    '''<div class="mediabox">
-                           <h3>Flux Balance Analysis (FBA)</h3>
-                           <p>Optimal flux through the objective reaction is <b>%g</b>.</p>
-                           <p>It involves <b>%d</b> reactions
-                           (<a href="%s" target="_blank">detailed description</a>, <a href="%s" download>SBML submodel</a>).</p>
-                        </div>
-                    ''' % (opt_val, len(r_id2val), get_f_path(fba_file), get_f_path(efm_sbml))
+                description += describe('fba.html', optimal_value=opt_val, r_num=len(r_id2val),
+                                        description_filepath=get_f_path(fba_file), sbml_filepath=get_f_path(efm_sbml))
 
     if do_efm:
         logging.info("Performing EFMA...")
@@ -191,32 +175,27 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
 
         id2efm = get_efms(target_r_id=out_r_id, target_r_reversed=out_rev, r_id2rev=in_r_id2rev, sbml=sbml,
                           directory=efm_dir, max_efm_number=max_efm_number, threshold=threshold, efms=efms,
-                          rewrite=out_r_id, r_ids=r_ids_of_interest)
+                          rewrite=out_r_id)
         if id2efm:
             all_efm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2efm.itervalues(),
                                           next(id2efm.itervalues()))
             all_efm_file = os.path.join(efm_dir, 'efms.txt')
             serialize_efms_txt(id2efm, all_efm_file, out_r_id, all_efm_intersection)
-            description += \
-                '''<div class="mediabox">
-                       <h3>Elementary Flux Mode Analysis (EFMA)</h3>
-                       <p>Calculated <b>%d</b> EFMs (<a href="%s" target="_blank">detailed description</a>).</p>
-                ''' % (len(id2efm), get_f_path(all_efm_file))
-
             # 3 shortest EFMs
-            mask_shift, description\
-                = process_n_fms(sbml, model, description, directory=efm_dir, id2fm=id2efm, id2mask=id2mask,
-                                       layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
-                                       sort_criterion='shortest', name='EFM', sorter=lambda (_, efm): len(efm),
-                                       serializer=lambda efm_id, efm_txt:
-                                       serialize_efm(efm_id, id2efm[efm_id], model, efm_txt, out_r_id),
-                                       suffix=lambda _: '', get_f_path=get_f_path)
-            description += '</div>'
+            limit = min(3, len(id2efm))
+            mask_shift, fms \
+                = process_n_fms(sbml, model, directory=efm_dir, id2fm=id2efm, id2mask=id2mask,
+                                layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
+                                name='EFM', sorter=lambda (_, efm): len(efm),
+                                serializer=lambda efm_id, efm_txt:
+                                serialize_efm(efm_id, id2efm[efm_id], model, efm_txt, out_r_id),
+                                suffix=lambda _: '', get_f_path=get_f_path, limit=limit, update_vis=False)
+            fm_block = describe('fm_block.html', element_num=limit, characteristics='shortest', element_name='EFM',
+                                fms=fms)
+            description += describe('efms.html', efm_num=len(id2efm), description_filepath=get_f_path(all_efm_file),
+                                    selected_efm_block=fm_block)
 
             # Important reactions
-            description += \
-                '''<div class="mediabox">
-                       <h3>Important reactions</h3>'''
             imp_rn_threshold = calculate_imp_rn_threshold(id2efm, ess_rn_num, imp_rn_threshold)
             rn_dir = os.path.join(efm_dir, 'important')
             create_dirs(rn_dir)
@@ -226,62 +205,15 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
                 serialize_important_reactions(r_id2efm_ids, model, imp_rn_txt, imp_rn_threshold)
                 imp_rn_sbml = os.path.join(rn_dir, 'Model_important.xml')
                 r_ids2sbml(important_r_ids, sbml, imp_rn_sbml, suffix='important')
-                description += '''<p>Found <b>%d</b> reactions participating in at least <b>%d</b> EFMs
-                       (<a href="%s" target="_blank">detailed description</a>, <a href="%s" download>SBML submodel</a>).</p>
-                       ''' % (len(important_r_ids), imp_rn_threshold, get_f_path(imp_rn_txt), get_f_path(imp_rn_sbml))
-                update_vis_layers(important_r_ids, 'Important reactions', id2mask, layer2mask, mask_shift, model, vis_r_ids)
+                update_vis_layers(important_r_ids, 'Important reactions', id2mask, layer2mask, mask_shift, model,
+                                  vis_r_ids)
                 mask_shift += 1
-            else:
-                description += '''<p>Did not find any reactions participating in at least <b>%d</b> EFMs.</p>
-                       ''' % imp_rn_threshold
-            description += '</div>'
-
-            avg_efm_len = sum((len(efm) for efm in id2efm.itervalues())) / len(id2efm)
-            min_efm_len = min((len(efm) for efm in id2efm.itervalues()))
-
-            # Patterns
-            if do_patterns:
-                description += '''<div class="mediabox">
-                           <h3>Patterns</h3>'''
-                min_pattern_len = calculate_min_pattern_len(avg_efm_len, ess_rn_num, min_efm_len, min_pattern_len)
-                pattern_dir = os.path.join(efm_dir, 'patterns')
-                create_dirs(pattern_dir)
-                p_id2efm_ids, id2pattern = classify_efms(id2efm, min_pattern_len=min_pattern_len,
-                                                                               min_efm_num=imp_rn_threshold)
-
-                if id2pattern:
-                    sorter = get_pattern_sorter(id2pattern, p_id2efm_ids)
-                    patterns_txt = os.path.join(pattern_dir, 'patterns.txt')
-                    serialize_patterns(p_id2efm_ids, id2pattern, patterns_txt, min_pattern_len, all_efm_intersection,
-                                       min_efm_num=imp_rn_threshold, sorter=sorter)
-                    description += '''
-                               <p>Detected <b>%d</b> patterns of length at least <b>%d</b>,
-                    found in at least <b>%d</b> EFMs
-                    (<a href="%s" target="_blank">detailed description</a>).</p>
-                    ''' % (len(id2pattern), min_pattern_len, imp_rn_threshold, get_f_path(patterns_txt))
-
-                    # 3 most common patterns
-                    mask_shift, description\
-                        = process_n_fms(sbml, model, description, directory=pattern_dir, id2fm=id2pattern, id2mask=id2mask,
-                                               layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
-                                               sort_criterion='most common', name='pattern',
-                                               sorter=lambda (p_id, _): -len(p_id2efm_ids[p_id]),
-                                               serializer=lambda p_id, pattern_txt:
-                                               serialize_pattern(p_id, id2pattern[p_id], p_id2efm_ids[p_id], model, pattern_txt),
-                                               suffix=lambda p_id:
-                                               'found in <b>%d</b> EFMs ' % len(p_id2efm_ids[p_id]),
-                                               get_f_path=get_f_path)
-                else:
-                    description += '''
-                               <p>Did not detect any patterns of length at least <b>%d</b>,
-                    found in at least <b>%d</b> EFMs.</p>
-                    ''' % (min_pattern_len, imp_rn_threshold)
-
-                description += '</div>'
+            description += describe('imp_reactions.html', r_num=len(important_r_ids), threshold=imp_rn_threshold,
+                                    description_filepath=get_f_path(imp_rn_txt) if important_r_ids else None,
+                                    sbml_filepath=get_f_path(imp_rn_sbml) if important_r_ids else None)
 
             # Cliques
-            description += '''<div class="mediabox">
-                       <h3>Cliques</h3>'''
+            avg_efm_len = sum((len(efm) for efm in id2efm.itervalues())) / len(id2efm)
             min_clique_len = calculate_min_clique_len(avg_efm_len, ess_rn_num, min_clique_len=None,
                                                       min_efm_len=imp_rn_threshold)
             clique_dir = os.path.join(efm_dir, 'cliques')
@@ -290,38 +222,89 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
 
             if id2clique:
                 cliques_txt = os.path.join(clique_dir, 'cliques.txt')
-                serialize_cliques(id2clique, cliques_txt, min_clique_len, all_efm_intersection, min_efm_num=imp_rn_threshold)
-                description += '''<p>Detected <b>%d</b> cliques of length at least <b>%d</b>,
-                with <b>%d</b> as min number of common EFMs for related reactions
-                (<a href="%s" target="_blank">detailed description</a>).</p>''' \
-                               % (len(id2clique), min_clique_len, imp_rn_threshold, get_f_path(cliques_txt))
-
+                serialize_cliques(id2clique, cliques_txt, min_clique_len, all_efm_intersection,
+                                  min_efm_num=imp_rn_threshold)
                 # 3 longest cliques
-                mask_shift, description \
-                    = process_n_fms(sbml, model, description, directory=clique_dir, id2fm=id2clique, id2mask=id2mask,
-                                           layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
-                                           sort_criterion='longest', name='clique',
-                                           sorter=lambda (_, cl): -len(cl),
-                                           serializer=lambda cl_id, clique_txt:
-                                           serialize_clique(cl_id, id2clique[cl_id], model, clique_txt),
-                                           suffix=lambda _: '', get_f_path=get_f_path)
-            else:
-                description += '''<p>Did not detect any cliques of length at least <b>%d</b>,
-                with <b>%d</b> as min number of common EFMs for related reactions.</p>''' \
-                               % (min_clique_len, imp_rn_threshold)
+                limit = min(3, len(id2clique))
+                mask_shift, fms \
+                    = process_n_fms(sbml, model, directory=clique_dir, id2fm=id2clique, id2mask=id2mask,
+                                    layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
+                                    name='clique', sorter=lambda (_, cl): -len(cl),
+                                    serializer=lambda cl_id, clique_txt:
+                                    serialize_clique(cl_id, id2clique[cl_id], model, clique_txt),
+                                    suffix=lambda _: '', limit=limit, get_f_path=get_f_path)
+                fm_block = describe('fm_block.html', element_num=limit, characteristics='longest', element_name='clique',
+                                    fms=fms)
 
-            description += '</div>'
+            description += describe('cliques.html', clique_num=len(id2clique), min_len=min_clique_len,
+                                    threshold=imp_rn_threshold, description_filepath=get_f_path(cliques_txt),
+                                    selected_clique_block=fm_block)
 
     logging.info('Putting everything together...')
 
     if not vis_r_ids:
-        description += '''<div class="mediabox">
-            <h3>No pathways found :(</div>'''
+        description += describe('nothing_found.html')
+
+    return sbml, vis_r_ids, description, mask_shift, id2mask, layer2mask
+
+
+def mean(values):
+    return sum(values) / len(values)
+
+
+def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_efm=True):
+    create_dirs(res_dir, True)
+    mask_shift = 4
+    tab2html = {}
+    layer2mask = {}
+
+    get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
+    merged_sbml = os.path.join(res_dir, 'Merged_model.xml')
+    sbml2id2id, common_ids = merge_models(sbml2parameters.iterkeys(), merged_sbml)
+    logging.info('Merged all the models into %s.' % merged_sbml)
+    comparison_prefix = os.path.join(res_dir, 'Model_comparison_')
+    (cc_num, cm_num, cr_num), (comp_csv, m_csv, r_csv) = \
+        serialize_common_part_to_csv(merged_sbml, sbml2id2id, common_ids,
+                                     {sbml: pars[-1] for (sbml, pars) in sbml2parameters.iteritems()}, comparison_prefix)
+
+    tab2html['Model comparison'] = \
+        describe('model_comparison.html', c_num=cc_num, m_num=cm_num, r_num=cr_num,
+                 c_csv=get_f_path(comp_csv), m_csv=get_f_path(m_csv), r_csv=get_f_path(r_csv)), None
+
+    id2mask = defaultdict(lambda: 0)
+    vis_r_ids = set()
+    for sbml, (out_r_id, out_rev, in_r_id2rev, name) in sbml2parameters.iteritems():
+        logging.info('Analysing %s...' % name)
+        sub_sbml, r_ids, description, mask_shift, cur_id2mask, cur_layer2mask = \
+            analyse_model(sbml, out_r_id, out_rev, os.path.join(res_dir, name), in_r_id2rev,
+                          do_fva=do_fva, do_fba=do_fba, do_efm=do_efm, max_efm_number=1000, mask_shift=mask_shift,
+                          get_f_path=get_f_path)
+        tab2html['Analysis of %s' % name] = description, None
+        layer2mask.update({'%s: %s' % (name, layer): mask for (layer, mask) in cur_layer2mask.iteritems()})
+        id2mask.update({sbml2id2id[sbml][id_]: id2mask[sbml2id2id[sbml][id_]] | mask
+                        for (id_, mask) in cur_id2mask.iteritems() if id_ in sbml2id2id[sbml]})
+        vis_r_ids |= {sbml2id2id[sbml][r_id] for r_id in r_ids if r_id in sbml2id2id[sbml]}
 
     combined_sbml = os.path.join(res_dir, 'Combined_model.xml')
-    r_ids2sbml(vis_r_ids, in_sbml, combined_sbml, 'combined')
-    process_sbml(combined_sbml, True, ub_ch_ids=ub_ch_ids, path='visualization', generalize=generalize,
-                 id2mask=id2mask, layer2mask=layer2mask, tab2html={'Analysis': description}, title=title)
+    r_ids2sbml(vis_r_ids, merged_sbml, combined_sbml, 'combined')
+
+    colors = get_n_colors(len(sbml2parameters) + 1, 0.5, 0.8)
+    info = ''
+    if common_ids:
+        mixed_color = colors[0]
+        r, g, b = mixed_color
+        info = describe('color.html', r=r, g=g, b=b, name='common reactions/metabolites')
+    sbml2color = dict(zip(sbml2id2id.iterkeys(), colors[1:]))
+    id2color = {}
+    for sbml, id2id in sbml2id2id.iteritems():
+        color = sbml2color[sbml]
+        r, g, b = color
+        id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.itervalues()})
+        info += describe('color.html', r=r, g=g, b=b, name=sbml2parameters[sbml][-1])
+
+    process_sbml(combined_sbml, verbose=True, path='visualization', generalize=False,
+                 id2mask=id2mask, layer2mask=layer2mask, tab2html=tab2html, title='Combined model analysis',
+                 id2color=id2color, tabs=None, info=info)
 
 
 def update_vis_layers(r_ids, layer, id2mask, layer2mask, mask_shift, model, vis_r_ids):
@@ -338,34 +321,29 @@ def update_vis_layers(r_ids, layer, id2mask, layer2mask, mask_shift, model, vis_
             id2mask.update({s_id: id2mask[s_id] | l_mask for s_id in get_products(r)})
 
 
-def process_n_fms(sbml, model, description, directory, id2fm, id2mask, layer2mask, mask_shift, vis_r_ids,
-                  sort_criterion, name, sorter, serializer, suffix, get_f_path):
-    limit = min(3, len(id2fm))
-    if limit:
-        sbml_dir = os.path.join(directory, 'sbml')
-        create_dirs(sbml_dir)
-        description += '''<p>%d %s %ss are:</p>
-        <ol class="small">''' % (limit, sort_criterion, name)
-        for fm_id, fm in sorted(id2fm.iteritems(), key=sorter):
-            r_id2coeff = fm.to_r_id2coeff()
-            c_name = name[0].upper() + name[1:]
-            fm_name = '%s_%d_of_len_%d' % (c_name, fm_id, len(fm))
-            fm_sbml = os.path.join(sbml_dir, '%s.xml' % fm_name)
-            r_ids2sbml(r_id2coeff.keys(), sbml, fm_sbml, fm_name)
-            fm_txt = os.path.join(sbml_dir, '%s.txt' % fm_name)
-            serializer(fm_id, fm_txt)
+def process_n_fms(sbml, model, directory, id2fm, id2mask, layer2mask, mask_shift, vis_r_ids,
+                  name, sorter, serializer, suffix, get_f_path, limit, update_vis=True):
+    sbml_dir = os.path.join(directory, 'sbml')
+    create_dirs(sbml_dir)
 
-            description += '''<li  class="small">%s %d of length <b>%d</b> %s
-                   (<a href="%s" target="_blank">detailed description</a>, <a href="%s" download>SBML submodel</a>);</li>
-                ''' % (c_name, fm_id, len(fm), suffix(fm_id), get_f_path(fm_txt), get_f_path(fm_sbml))
+    fms = []
+    for fm_id, fm in sorted(id2fm.iteritems(), key=sorter):
+        r_id2coeff = fm.to_r_id2coeff()
+        c_name = name[0].upper() + name[1:]
+        fm_name = '%s_%d_of_len_%d' % (c_name, fm_id, len(fm))
+        fm_sbml = os.path.join(sbml_dir, '%s.xml' % fm_name)
+        r_ids2sbml(r_id2coeff.keys(), sbml, fm_sbml, fm_name)
+        fm_txt = os.path.join(sbml_dir, '%s.txt' % fm_name)
+        serializer(fm_id, fm_txt)
+        fms.append((c_name, fm_id, len(fm), suffix(fm_id), get_f_path(fm_txt), get_f_path(fm_sbml)))
 
-            update_vis_layers(set(r_id2coeff), '%s %d' % (c_name, fm_id), id2mask, layer2mask, mask_shift, model, vis_r_ids)
+        if update_vis:
+            update_vis_layers(set(r_id2coeff), '%s %d' % (c_name, fm_id), id2mask, layer2mask, mask_shift, model,
+                              vis_r_ids)
             mask_shift += 1
 
-            limit -= 1
-            if limit <= 0:
-                break
-        description += '''</ol>
-        </p>'''
-    return mask_shift, description
+        limit -= 1
+        if limit <= 0:
+            break
+    return mask_shift, fms
 

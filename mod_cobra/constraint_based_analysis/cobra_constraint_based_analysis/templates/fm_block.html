@@ -1,0 +1,7 @@
+<p>{{element_num}} {{characteristics}} {{element_name}}{% if 1 != element_num %}s are{% else %} is{% endif %}:</p>
+<ol class="small">
+    {% for (name, fm_id, fm_len, text, fm_txt, fm_sbml) in fms %}
+    <li  class="small">{{name}} {{fm_id}} of length <b>{{fm_len}}</b> {{text}}
+           (<a href="{{fm_txt}}" target="_blank">detailed description</a>,
+        <a href="{{fm_sbml}}" download>SBML submodel</a>);</li>
+</ol>
