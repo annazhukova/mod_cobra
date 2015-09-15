@@ -20,18 +20,13 @@ def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_
                 return None
         else:
             raise ValueError('No EFMs found :(. Probably, you forgot to specify TreeEFM path?')
-    id2efm = dict(zip(xrange(1, len(efms) + 1), efms))
+    id2efm = dict(zip(xrange(0, len(efms)), efms))
     return id2efm
 
 
-def calculate_imp_rn_threshold(all_id2efm, essential_rn_number, imp_rn_threshold):
-    if imp_rn_threshold is None:
-        imp_rn_threshold = int(len(all_id2efm) * 0.3)
-        if essential_rn_number:
-            at_least_num = min(int(essential_rn_number * 1.25), len(all_id2efm))
-            if at_least_num == len(all_id2efm):
-                at_least_num = min(max(len(all_id2efm) / 2, essential_rn_number + 2), len(all_id2efm) - 1)
-            imp_rn_threshold = max(2, at_least_num, imp_rn_threshold)
+def calculate_imp_rn_threshold(total_len, imp_rn_threshold=None):
+    if not imp_rn_threshold:
+        imp_rn_threshold = max(2, int(total_len * 0.3))
     return imp_rn_threshold
 
 
@@ -43,11 +38,9 @@ def calculate_min_pattern_len(avg_efm_len, essential_rn_number, min_efm_len, min
     return min_pattern_len
 
 
-def calculate_min_clique_len(avg_efm_len, essential_rn_number, min_clique_len, min_efm_len):
+def calculate_min_clique_len(intersection_len, min_clique_len=None):
     if not min_clique_len:
-        min_clique_len = min(avg_efm_len / 4, min_efm_len)
-        if essential_rn_number:
-            min_clique_len = min(max(essential_rn_number + 3, min_clique_len), avg_efm_len)
+        min_clique_len = intersection_len + 1
     return min_clique_len
 
 

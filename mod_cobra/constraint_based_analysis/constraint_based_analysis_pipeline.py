@@ -5,18 +5,17 @@ import shutil
 
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
+
+from community_detection import detect_efm_communities, detect_reaction_community
 from html_descriptor import describe
 from mod_sbml.serialization.csv_manager import serialize_common_part_to_csv, serialize_model_info
-
 from graph.color.color import get_n_colors
 from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_manager import serialize_fva, \
     serialize_fluxes
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.model_manager import format_r_id
-from mod_cobra.constraint_based_analysis.efm.clique_detection import detect_cliques
 from mod_cobra.constraint_based_analysis.efm.efm_serialization_manager import r_ids2sbml, serialize_efms_txt, serialize_efm, \
-    serialize_important_reactions, serialize_cliques, serialize_clique
-from mod_cobra.constraint_based_analysis.efm.reaction_classification_by_efm import get_important_reactions
+    serialize_communities, serialize_community
 from mod_cobra.gibbs.reaction_boundary_manager import get_bounds, set_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants, reverse_reaction, get_r_comps
 from mimoza_pipeline import process_sbml
@@ -24,8 +23,7 @@ from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_ana
     create_fba_model
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fva_analyser import analyse_by_fva, \
     create_fva_model, create_essential_r_ids_model
-from mod_cobra.constraint_based_analysis.efm.efm_analyser import calculate_imp_rn_threshold, get_efms, \
-    calculate_min_clique_len
+from mod_cobra.constraint_based_analysis.efm.efm_analyser import get_efms
 from mod_sbml.utils.path_manager import create_dirs
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
@@ -110,7 +108,6 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
     id2mask = defaultdict(lambda: 0)
     layer2mask = {}
 
-    ess_rn_num = 0
     objective_sense = 'minimize' if out_rev else 'maximize'
     vis_r_ids = set()
     if do_fva:
@@ -179,6 +176,11 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
         if id2efm:
             all_efm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2efm.itervalues(),
                                           next(id2efm.itervalues()))
+            update_vis_layers(set(all_efm_intersection.to_r_id2coeff(binary=True).iterkeys()),
+                              'EFM intersection', id2mask, layer2mask, mask_shift, model, vis_r_ids)
+            mask_shift += 1
+
+            logging.info('Detected %d EFMs with common part of length %d.' % (len(id2efm), len(all_efm_intersection)))
             all_efm_file = os.path.join(efm_dir, 'efms.txt')
             serialize_efms_txt(id2efm, all_efm_file, out_r_id, all_efm_intersection)
             # 3 shortest EFMs
@@ -195,50 +197,105 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             description += describe('efms.html', efm_num=len(id2efm), description_filepath=get_f_path(all_efm_file),
                                     selected_efm_block=fm_block)
 
-            # Important reactions
-            imp_rn_threshold = calculate_imp_rn_threshold(id2efm, ess_rn_num, imp_rn_threshold)
-            rn_dir = os.path.join(efm_dir, 'important')
-            create_dirs(rn_dir)
-            r_id2efm_ids, important_r_ids = get_important_reactions(id2efm, imp_rn_threshold)
-            if important_r_ids:
-                imp_rn_txt = os.path.join(rn_dir, 'r_list.txt')
-                serialize_important_reactions(r_id2efm_ids, model, imp_rn_txt, imp_rn_threshold)
-                imp_rn_sbml = os.path.join(rn_dir, 'Model_important.xml')
-                r_ids2sbml(important_r_ids, sbml, imp_rn_sbml, suffix='important')
-                update_vis_layers(important_r_ids, 'Important reactions', id2mask, layer2mask, mask_shift, model,
-                                  vis_r_ids)
-                mask_shift += 1
-            description += describe('imp_reactions.html', r_num=len(important_r_ids), threshold=imp_rn_threshold,
-                                    description_filepath=get_f_path(imp_rn_txt) if important_r_ids else None,
-                                    sbml_filepath=get_f_path(imp_rn_sbml) if important_r_ids else None)
+            # # Important reactions
+            # imp_rn_threshold = calculate_imp_rn_threshold(len(id2efm))
+            # rn_dir = os.path.join(efm_dir, 'important')
+            # create_dirs(rn_dir)
+            # r_id2efm_ids, important_r_ids = get_important_reactions(id2efm, imp_rn_threshold)
+            # if important_r_ids:
+            #     imp_rn_txt = os.path.join(rn_dir, 'r_list.txt')
+            #     serialize_important_reactions(r_id2efm_ids, model, imp_rn_txt, imp_rn_threshold)
+            #     imp_rn_sbml = os.path.join(rn_dir, 'Model_important.xml')
+            #     r_ids2sbml(important_r_ids, sbml, imp_rn_sbml, suffix='important')
+            #     update_vis_layers(important_r_ids, 'Important reactions', id2mask, layer2mask, mask_shift, model,
+            #                       vis_r_ids)
+            #     mask_shift += 1
+            # description += describe('imp_reactions.html', r_num=len(important_r_ids), threshold=imp_rn_threshold,
+            #                         description_filepath=get_f_path(imp_rn_txt) if important_r_ids else None,
+            #                         sbml_filepath=get_f_path(imp_rn_sbml) if important_r_ids else None)
 
-            # Cliques
-            avg_efm_len = sum((len(efm) for efm in id2efm.itervalues())) / len(id2efm)
-            min_clique_len = calculate_min_clique_len(avg_efm_len, ess_rn_num, min_clique_len=None,
-                                                      min_efm_len=imp_rn_threshold)
-            clique_dir = os.path.join(efm_dir, 'cliques')
-            create_dirs(clique_dir)
-            id2clique = detect_cliques(id2efm, min_clique_size=min_clique_len, efm_num=imp_rn_threshold)
-
-            if id2clique:
-                cliques_txt = os.path.join(clique_dir, 'cliques.txt')
-                serialize_cliques(id2clique, cliques_txt, min_clique_len, all_efm_intersection,
-                                  min_efm_num=imp_rn_threshold)
-                # 3 longest cliques
-                limit = min(3, len(id2clique))
+            # Communities
+            comm_dir = os.path.join(efm_dir, 'communities')
+            create_dirs(comm_dir)
+            id2cluster = detect_efm_communities(id2efm, threshold=len(all_efm_intersection))
+            id2intersection = {cl_id: reduce(lambda p1, p2: p1.intersection(p2),
+                                             (id2efm[efm_id] for efm_id in cluster), id2efm[cluster[0]])
+                               for (cl_id, cluster) in id2cluster.iteritems()}
+            imp_fraction = 60
+            # id2imp_rns = {cl_id: get_important_reaction_FM({efm_id: id2efm[efm_id] for efm_id in cluster},
+            #                                                max(imp_fraction * len(cluster) / 100, 2))
+            #               for (cl_id, cluster) in id2cluster.iteritems()}
+            id2imp_rns = {cl_id: detect_reaction_community({efm_id: id2efm[efm_id] for efm_id in cluster},
+                                                                     imp_fraction, id2intersection[cl_id])
+                          for (cl_id, cluster) in id2cluster.iteritems()}
+            if id2cluster:
+                comm_txt = os.path.join(comm_dir, 'communities.txt')
+                serialize_communities(id2cluster, id2intersection, id2imp_rns, len(id2efm),
+                                      all_efm_intersection, comm_txt)
+                # All clusters
+                limit = len(id2cluster)
                 mask_shift, fms \
-                    = process_n_fms(sbml, model, directory=clique_dir, id2fm=id2clique, id2mask=id2mask,
+                    = process_n_fms(sbml, model, directory=comm_dir, id2fm=id2imp_rns, id2mask=id2mask,
                                     layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
-                                    name='clique', sorter=lambda (_, cl): -len(cl),
-                                    serializer=lambda cl_id, clique_txt:
-                                    serialize_clique(cl_id, id2clique[cl_id], model, clique_txt),
+                                    name='community', sorter=lambda (cl_id, cl): cl_id,
+                                    serializer=lambda cl_id, community_txt:
+                                    serialize_community(cl_id, id2intersection[cl_id], id2imp_rns[cl_id],
+                                                        len(id2imp_rns[cl_id]), model, community_txt),
                                     suffix=lambda _: '', limit=limit, get_f_path=get_f_path)
-                fm_block = describe('fm_block.html', element_num=limit, characteristics='longest', element_name='clique',
-                                    fms=fms)
+                fm_block = describe('fm_block.html', element_num=limit, characteristics='(all)',
+                                    element_name='community', fms=fms, all=True)
+            description += describe('communities.html', community_num=len(id2cluster),
+                                    description_filepath=get_f_path(comm_txt) if id2cluster else None,
+                                    selected_community_block=fm_block)
 
-            description += describe('cliques.html', clique_num=len(id2clique), min_len=min_clique_len,
-                                    threshold=imp_rn_threshold, description_filepath=get_f_path(cliques_txt),
-                                    selected_clique_block=fm_block)
+            # Reaction communities
+            # comm_dir = os.path.join(efm_dir, 'reaction_communities')
+            # create_dirs(comm_dir)
+            # r_community_threshold = len(id2efm) / 2
+            # id2r_community = detect_reaction_communities(id2efm, threshold=r_community_threshold, min_len=2)
+            # if id2r_community:
+            #     comm_txt = os.path.join(comm_dir, 'reaction_communities.txt')
+            #     serialize_cliques(id2r_community, comm_txt, 2, all_efm_intersection, r_community_threshold)
+            #     # 3 longest cliques
+            #     limit = min(3, len(id2r_community))
+            #     mask_shift, fms \
+            #         = process_n_fms(sbml, model, directory=comm_dir, id2fm=id2r_community, id2mask=id2mask,
+            #                         layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
+            #                         name='clique', sorter=lambda (_, cl): -len(cl),
+            #                         serializer=lambda cl_id, clique_txt:
+            #                         serialize_clique(cl_id, id2r_community[cl_id], model, clique_txt),
+            #                         suffix=lambda _: '', limit=limit, get_f_path=get_f_path)
+            #     fm_block = describe('fm_block.html', element_num=limit, characteristics='longest', element_name='clique',
+            #                         fms=fms)
+            # description += describe('cliques.html', clique_num=len(id2r_community), min_len=2,
+            #                         threshold=r_community_threshold, description_filepath=get_f_path(comm_txt),
+            #                         selected_clique_block=fm_block)
+
+            # # Cliques
+            # min_clique_len = calculate_min_clique_len(len(all_efm_intersection))
+            # clique_dir = os.path.join(efm_dir, 'cliques')
+            # create_dirs(clique_dir)
+            # id2clique = detect_cliques(id2efm, min_clique_size=min_clique_len, efm_num=imp_rn_threshold)
+            #
+            # if id2clique:
+            #     cliques_txt = os.path.join(clique_dir, 'cliques.txt')
+            #     serialize_cliques(id2clique, cliques_txt, min_clique_len, all_efm_intersection,
+            #                       min_efm_num=imp_rn_threshold)
+            #     # 3 longest cliques
+            #     limit = min(3, len(id2clique))
+            #     mask_shift, fms \
+            #         = process_n_fms(sbml, model, directory=clique_dir, id2fm=id2clique, id2mask=id2mask,
+            #                         layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
+            #                         name='clique', sorter=lambda (_, cl): -len(cl),
+            #                         serializer=lambda cl_id, clique_txt:
+            #                         serialize_clique(cl_id, id2clique[cl_id], model, clique_txt),
+            #                         suffix=lambda _: '', limit=limit, get_f_path=get_f_path)
+            #     fm_block = describe('fm_block.html', element_num=limit, characteristics='longest', element_name='clique',
+            #                         fms=fms)
+            #
+            # description += describe('cliques.html', clique_num=len(id2clique), min_len=min_clique_len,
+            #                         threshold=imp_rn_threshold, description_filepath=get_f_path(cliques_txt),
+            #                         selected_clique_block=fm_block)
 
     logging.info('Putting everything together...')
 

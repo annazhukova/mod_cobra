@@ -62,21 +62,21 @@ class EFM(object):
     def __str__(self, binary=False):
         return self.to_string()
 
-    def to_string(self, binary=False, subpattern=None):
+    def to_string(self, binary=False, subpattern=None, key=None):
         r_id2coefficient = self.to_r_id2coeff()
         subkeys = set()
         if subpattern:
             subkeys = set(r_id2coefficient.iterkeys()) & set(subpattern.to_r_id2coeff().iterkeys())
-        keys = sorted(set(r_id2coefficient.iterkeys()) - subkeys)
+        keys = sorted(set(r_id2coefficient.iterkeys()) - subkeys, key=key)
         if binary or not self.coefficients:
             result = ''
             if subkeys:
                 result += '(%s)\t' % '\t'.join('%s%s' % ('-' if r_id2coefficient[r_id] < 0 else '', r_id)
-                                             for r_id in sorted(subkeys))
+                                             for r_id in sorted(subkeys, key=key))
             return result + '\t'.join('%s%s' % ('-' if r_id2coefficient[r_id] < 0 else '', r_id) for r_id in keys)
         result = ''
         if subkeys:
-            result += '(%s)\t' % '\t'.join('%g %s' % (r_id2coefficient[r_id], r_id) for r_id in sorted(subkeys))
+            result += '(%s)\t' % '\t'.join('%g %s' % (r_id2coefficient[r_id], r_id) for r_id in sorted(subkeys, key=key))
         return result + '\t'.join('%g %s' % (r_id2coefficient[r_id], r_id) for r_id in keys)
 
     def __from_r_id2coeff(self, r_id2coeff):

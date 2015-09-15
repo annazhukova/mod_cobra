@@ -59,7 +59,7 @@ def classify_efms(id2efm, min_pattern_len, min_efm_num=2, max_pattern_num=None):
     max_pattern_num = min(len(pattern2efm_ids), max_pattern_num if max_pattern_num else len(pattern2efm_ids))
     patterns = sorted((p for p in pattern2efm_ids.iterkeys() if len(pattern2efm_ids[p]) >= min_efm_num),
                       key=lambda p: -len(pattern2efm_ids[p]))[0: max_pattern_num]
-    id2pattern = dict(zip(xrange(1, len(patterns) + 1), patterns))
+    id2pattern = dict(zip(xrange(0, len(patterns)), patterns))
     p_id2efm_ids = {p_id: pattern2efm_ids[p] for (p_id, p) in id2pattern.iteritems()}
     return p_id2efm_ids, id2pattern
 

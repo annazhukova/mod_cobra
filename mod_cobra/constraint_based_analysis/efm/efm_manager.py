@@ -50,7 +50,6 @@ def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=
         os.system("%s -r %d -i %s -l EM -e %d -o %s -z %d" % (tree_efm_path, i, st_matrix_file, em_number, directory,
                                                               threshold))
         os.system("%s -b %s" % (tree_efm_path, efm_file))
-        logging.info("elementary modes saved to %s" % efm_file_txt)
     # Filter EFMs so that only those that don't include the reaction in opposite directions are left.
     # If r_id2rev is specified, filter EFMs to leave only those that include these reactions in these directions.
     em_file_filtered = os.path.join(directory, "FV-EM_filtered.dat.txt")

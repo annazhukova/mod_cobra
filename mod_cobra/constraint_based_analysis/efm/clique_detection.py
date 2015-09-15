@@ -45,7 +45,7 @@ def detect_cliques(id2efm, min_clique_size, efm_num=2):
     cliques = [EFM(r_ids=r_ids, rev_r_ids=rev_r_ids, int_size=int_size,
                     r_id2coeff=clique2r_id2coeff(clique)) for clique in
                 (clique for clique in find_cliques(gr) if len(clique) >= min_clique_size)]
-    id2clique = dict(zip(xrange(1, len(cliques) + 1), cliques))
+    id2clique = dict(zip(xrange(0, len(cliques)), cliques))
     return id2clique
 
 

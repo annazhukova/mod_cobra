@@ -1,0 +1,11 @@
+<div class="mediabox">
+    <h3>Communities</h3>
+    {% if community_num %}
+        <p>Detected <b>{{community_num}}</b> communities of EFMs
+            (<a href="{{description_filepath}}" target="_blank">detailed description</a>).</p>
+
+        {{selected_community_block}}
+    {% else %}
+        <p>Did not detect any communities of EFMs.</p>
+    {% endif %}
+</div>

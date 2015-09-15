@@ -1,5 +1,6 @@
 from collections import defaultdict
 import logging
+from EFM import EFM
 
 __author__ = 'anna'
 
@@ -23,9 +24,23 @@ def classify_reactions_by_efm(id2efm):
                 r_id2efm_ids[r_id].add(efm_id)
     return r_id2efm_ids
 
+
 def get_important_reactions(id2efm, imp_rn_threshold):
     r_id2efm_ids = classify_reactions_by_efm(id2efm)
     r_id2efm_ids = {r_id: efm_ids for (r_id, efm_ids) in r_id2efm_ids.iteritems()
                     if len(efm_ids) > imp_rn_threshold}
     important_r_ids = {r_id[1:] if '-' == r_id[0] else r_id for r_id in r_id2efm_ids.iterkeys()}
     return r_id2efm_ids, important_r_ids
+
+
+def get_important_reaction_FM(id2efm, imp_rn_threshold):
+    r_id2efm_ids = defaultdict(set)
+    for efm_id, efm in id2efm.iteritems():
+        r_id2coeff = efm.to_r_id2coeff(binary=True)
+        for r_id, coeff in r_id2coeff.iteritems():
+            r_id2efm_ids[(r_id, coeff)].add(efm_id)
+    r_id2coeff = {r_id: coeff for ((r_id, coeff), efm_ids) in r_id2efm_ids.iteritems()
+                  if len(efm_ids) > imp_rn_threshold}
+    sample_efm = next(id2efm.itervalues())
+    return EFM(r_ids=sample_efm.r_ids, rev_r_ids=sample_efm.rev_r_ids, int_size=sample_efm.int_size,
+               r_id2coeff=r_id2coeff)
