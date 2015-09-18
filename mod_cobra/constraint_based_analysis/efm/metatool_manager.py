@@ -51,8 +51,8 @@ def convert_metabolite(m_id, model, boundary=False, create_boundary_reaction=Fal
                 s.setBoundaryCondition(boundary)
 
 
-def convert_metabolites(m_id2c_id_b, model, create_boundary_reaction=False, abbr2name=None):
-    for m_id, (c_id, b) in m_id2c_id_b.iteritems():
+def convert_metabolites(m_id2c_id_b, model, create_boundary_reaction=False, abbr2name=None, boundary=None):
+    for m_id, (c_id, b) in m_id2c_id_b.items():
         if m_id and c_id:
             m_name = m_id[:-1]
             if abbr2name and m_name in abbr2name:
@@ -64,7 +64,16 @@ def convert_metabolites(m_id2c_id_b, model, create_boundary_reaction=False, abbr
             s.setCompartment(c_id)
             if b:
                 if create_boundary_reaction:
-                    convert_reaction(model, 'r_%s_exchange' % m_id_norm, True, {m_id: 1}, {},
+                    m_id_b = None
+                    if boundary:
+                        m_id_b = '%s_b' % m_id_norm
+                        s_b = model.createSpecies()
+                        s_b.setId(m_id_b)
+                        s_b.setName(m_name)
+                        s_b.setCompartment(boundary)
+                        s_b.setBoundaryCondition(True)
+                        m_id2c_id_b[m_id_b] = (boundary, True)
+                    convert_reaction(model, 'r_%s_exchange' % m_id_norm, True, {m_id_b: 1} if m_id_b else {}, {m_id: 1},
                                      r_name='Exchange of %s' % m_name, m_id2c_id_b=m_id2c_id_b)
                 else:
                     s.setBoundaryCondition(b)
@@ -155,6 +164,9 @@ def convert_dat2sbml(in_dat, out_sbml, create_boundary_reaction=True, c_id2c_nam
         else:
             c_id2c_name = {'c': "cell"}
             default_c_id = 'c'
+    if create_boundary_reaction:
+        boundary = 'b'
+        c_id2c_name['b'] = 'Boundary'
     for c_id, c_name in c_id2c_name.iteritems():
         c = model.createCompartment()
         c.setId(c_id)
@@ -197,7 +209,8 @@ def convert_dat2sbml(in_dat, out_sbml, create_boundary_reaction=True, c_id2c_nam
                 convert_reaction(model, r_id, r_id in r_ids_rev, dict(extract_m_id_stoichiometry_pairs(rs)),
                                  dict(extract_m_id_stoichiometry_pairs(ps)), default_c_id=default_c_id,
                                  m_id2c_id_b=m_id2c_id_b)
-    convert_metabolites(m_id2c_id_b, model, create_boundary_reaction=create_boundary_reaction, abbr2name=abbr2name)
+    convert_metabolites(m_id2c_id_b, model, create_boundary_reaction=create_boundary_reaction, abbr2name=abbr2name,
+                        boundary=boundary)
     libsbml.SBMLWriter().writeSBMLToFile(document, out_sbml)
     logging.info("...%s converted to %s" % (in_dat, out_sbml))
     return r_rev_ids, r_irrev_ids

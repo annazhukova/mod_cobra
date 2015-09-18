@@ -31,4 +31,4 @@ def analyse_by_fba(cobra_model, bm_r_id, objective_sense='maximize', threshold=0
         r_id2val = get_fluxes_larger_than_threshold(cobra_model, threshold=threshold)
 
         return r_id2val, opt_value
-    return None, None
+    return {}, None

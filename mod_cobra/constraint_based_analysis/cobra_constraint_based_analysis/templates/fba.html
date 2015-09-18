@@ -1,7 +1,10 @@
 <div class="mediabox">
    <h3>Flux Balance Analysis (FBA)</h3>
-   <p>Optimal flux through the objective reaction is <b>{{optimal_value}}</b>.</p>
-   <p>It involves <b>{{r_num}}</b> reactions
-   (<a href="{{description_filepath}}" target="_blank">detailed description</a>,
-   <a href="{{sbml_filepath}}" download>SBML submodel</a>).</p>
+   {% if optimal_value != 0 %}
+      <p>Optimal flux through the objective reaction is <b>{{optimal_value}}</b>.</p>
+      <p>It involves <b>{{r_num}}</b> reactions
+      (<a href="{{description_filepath}}" target="_blank">detailed description</a>.</p>
+   {% else %}
+      <p>Found no optimal solution.</p>
+   {% endif %}
 </div>

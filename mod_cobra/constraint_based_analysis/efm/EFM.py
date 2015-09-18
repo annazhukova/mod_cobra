@@ -1,6 +1,8 @@
+from collections import Counter
 import math
 import sys
 import gmpy
+from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 
 __author__ = 'anna'
 
@@ -59,10 +61,23 @@ class EFM(object):
             if r_id2coeff:
                 self.__from_r_id2coeff(r_id2coeff)
 
+    def translate(self, id2id, r_ids, rev_r_ids):
+        r_id2coeff = {id2id[r_id]: coeff for (r_id, coeff) in self.to_r_id2coeff().iteritems()}
+        return EFM(r_ids=r_ids, rev_r_ids=rev_r_ids, int_size=self.int_size, r_id2coeff=r_id2coeff)
+
+    def join(self, efms, zero_threshold=ZERO_THRESHOLD):
+        if not efms:
+            return self
+        r_id2coeff = Counter(self.to_r_id2coeff())
+        for efm in efms:
+            r_id2coeff.update(efm.to_r_id2coeff())
+        return EFM(r_id2coeff={r_id: coeff for (r_id, coeff) in r_id2coeff.iteritems() if abs(coeff) > zero_threshold},
+                   r_ids=self.r_ids, rev_r_ids=self.rev_r_ids, int_size=self.int_size)
+
     def __str__(self, binary=False):
         return self.to_string()
 
-    def to_string(self, binary=False, subpattern=None, key=None):
+    def to_string(self, binary=False, subpattern=None, key=None, show_subpattern=True):
         r_id2coefficient = self.to_r_id2coeff()
         subkeys = set()
         if subpattern:
@@ -70,12 +85,12 @@ class EFM(object):
         keys = sorted(set(r_id2coefficient.iterkeys()) - subkeys, key=key)
         if binary or not self.coefficients:
             result = ''
-            if subkeys:
+            if subkeys and show_subpattern:
                 result += '(%s)\t' % '\t'.join('%s%s' % ('-' if r_id2coefficient[r_id] < 0 else '', r_id)
                                              for r_id in sorted(subkeys, key=key))
             return result + '\t'.join('%s%s' % ('-' if r_id2coefficient[r_id] < 0 else '', r_id) for r_id in keys)
         result = ''
-        if subkeys:
+        if subkeys and show_subpattern:
             result += '(%s)\t' % '\t'.join('%g %s' % (r_id2coefficient[r_id], r_id) for r_id in sorted(subkeys, key=key))
         return result + '\t'.join('%g %s' % (r_id2coefficient[r_id], r_id) for r_id in keys)
 

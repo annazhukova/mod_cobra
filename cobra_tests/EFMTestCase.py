@@ -36,7 +36,7 @@ class EFMTestCase(unittest.TestCase):
             shutil.rmtree(EFM_DIR, True)
 
     def test_efm_num(self):
-        id2efm = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
+        id2efm, _ = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
         self.assertEqual(2, len(id2efm), 'EFM number was supposed to be 2, got %g instead.' % len(id2efm))
 
     def test_efm_content(self):
@@ -45,7 +45,7 @@ class EFMTestCase(unittest.TestCase):
                       'Failed to detect EFM: 10 r1, 10 r2, 10 r3')
 
     def test_important_reactions(self):
-        id2efm = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
+        id2efm, _ = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
         _, important_r_ids = get_important_reactions(id2efm, imp_rn_threshold=0)
         imp_rs = {'r1', 'r2', 'r3', 'r4', 'r6'}
         self.assertEqual(imp_rs, important_r_ids, "Important reactions were supposed to be %s, got %s"

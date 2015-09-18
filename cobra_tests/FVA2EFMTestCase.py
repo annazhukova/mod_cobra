@@ -55,7 +55,7 @@ class EFMTestCase(unittest.TestCase):
         cobra_model = create_cobra_model_from_sbml_file(TEST_SBML)
         r_id2bounds, _ = analyse_by_fva(cobra_model, bm_r_id='r3', objective_sense='maximize')
 
-        id2efm = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
+        id2efm, _ = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
         _, important_r_ids = get_important_reactions(id2efm, imp_rn_threshold=0)
 
         for r_id in r_id2bounds.iterkeys():

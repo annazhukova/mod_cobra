@@ -1,8 +1,11 @@
 <div class="mediabox">
    <h3>Flux Variability Analysis (FVA)</h3>
-   <p>Optimal flux through the objective reaction is <b>{{optimal_value}}</b>.</p>
-   <p>It requires <b>{{ess_r_num}}</b> essential and <b>{{var_r_num}}</b> variable reactions
-   (<a href="{{description_filepath}}" target="_blank">detailed description</a>,
-   <a href="{{ess_sbml_filepath}}" download>SBML submodel of essential reactions</a>,
-   <a href="{{sbml_filepath}}" download>SBML submodel of essential and variable reactions</a>).</p>
+   {% if optimal_value != 0 %}
+      <p>Optimal flux through the objective reaction is <b>{{optimal_value}}</b>.</p>
+      <p>It requires <b>{{ess_r_num}}</b> essential and <b>{{var_r_num}}</b> variable reactions
+      (<a href="{{description_filepath}}" target="_blank">detailed description</a>,
+      <a href="{{sbml_filepath}}" download>SBML submodel of essential and variable reactions</a>).</p>
+   {% else %}
+      <p>Found no optimal solution.</p>
+   {% endif %}
 </div>

@@ -1,7 +1,10 @@
+from collections import defaultdict
 import logging
 
+from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_efficiency
 from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.efm.efm_manager import compute_efms
+from mod_sbml.sbml.submodel_manager import compress_reaction_participants
 
 TREEEFM_PATH = "/home/anna/Applications/TreeEFM/tool/TreeEFMseq"
 
@@ -20,8 +23,25 @@ def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_
                 return None
         else:
             raise ValueError('No EFMs found :(. Probably, you forgot to specify TreeEFM path?')
-    id2efm = dict(zip(xrange(0, len(efms)), efms))
-    return id2efm
+    return assign_ids_by_efficiency(efms, target_r_id, target_r_reversed)
+
+
+def assign_ids_by_efficiency(fms, target_r_id, target_r_rev):
+    fm2efficiency = {fm: get_fm_efficiency(fm, target_r_id, target_r_rev) for fm in fms}
+    id2fm = dict(zip(xrange(0, len(fms)), sorted(fms, key=lambda fm: -fm2efficiency[fm])))
+    fm_id2efficiency = {fm_id: fm2efficiency[fm] for (fm_id, fm) in id2fm.iteritems()}
+    return id2fm, fm_id2efficiency
+
+
+def group_efms(id2efm, model, target_r_id, target_r_rev):
+    key2efm_ids = defaultdict(list)
+    for efm_id, efm in id2efm.iteritems():
+        m_id2stoichiometry = tuple(sorted(compress_reaction_participants(model, efm.to_r_id2coeff()).iteritems()))
+        key2efm_ids[m_id2stoichiometry].append(efm_id)
+    fm2key = {id2efm[efm_ids[0]].join([id2efm[efm_id] for efm_id in efm_ids[1:]]): key
+              for (key, efm_ids) in key2efm_ids.iteritems()}
+    id2fm, fm_id2efficiency = assign_ids_by_efficiency(fm2key.keys(), target_r_id, target_r_rev)
+    return id2fm, fm_id2efficiency, {fm_id: fm2key[fm] for (fm_id, fm) in id2fm.iteritems()}, key2efm_ids
 
 
 def calculate_imp_rn_threshold(total_len, imp_rn_threshold=None):

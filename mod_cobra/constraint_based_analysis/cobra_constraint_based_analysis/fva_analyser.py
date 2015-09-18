@@ -19,7 +19,7 @@ def analyse_by_fva(cobra_model, bm_r_id, objective_sense='maximize', threshold=0
         r_id2bounds = get_r_id2fva_bounds(cobra_model, threshold=threshold)
 
         return r_id2bounds, opt_value
-    return None, None
+    return {}, None
 
 
 def create_fva_model(sbml, r_id2bounds, new_sbml):

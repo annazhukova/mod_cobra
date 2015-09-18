@@ -1,6 +1,6 @@
 <div class="mediabox">
     <h3>Model comparison</h3>
-    <p>Found <b>{{c_num}}</b> common compartments (<a href="{{c_csv}}" download>detailed description</a>),
-    <b>{{m_num}}</b> common metabolites (<a href="{{m_csv}}" download>detailed description</a>),
-     and <b>{{r_num}}</b> common reactions (<a href="{{r_csv}}s" download>detailed description</a>).</p>
+    <p>Found {% if c_num > 0 %}<b>{{c_num}}</b>{% else %}no{% endif %} common compartments{% if c_num > 0 %} (<a href="{{c_csv}}" download>detailed description</a>){% endif %},
+    {% if m_num > 0 %}<b>{{m_num}}</b>{% else %}no{% endif %} common metabolites{% if m_num > 0 %} (<a href="{{m_csv}}" download>detailed description</a>){% endif %},
+     and {% if r_num > 0 %}<b>{{r_num}}</b>{% else %}no{% endif %} common reactions{% if r_num > 0 %} (<a href="{{r_csv}}" download>detailed description</a>){% endif %}.</p>
 </div>
