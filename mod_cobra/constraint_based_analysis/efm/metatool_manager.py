@@ -73,7 +73,7 @@ def convert_metabolites(m_id2c_id_b, model, create_boundary_reaction=False, abbr
                         s_b.setCompartment(boundary)
                         s_b.setBoundaryCondition(True)
                         m_id2c_id_b[m_id_b] = (boundary, True)
-                    convert_reaction(model, 'r_%s_exchange' % m_id_norm, True, {m_id_b: 1} if m_id_b else {}, {m_id: 1},
+                    convert_reaction(model, '%s_exchange' % m_id_norm, True, {m_id_b: 1} if m_id_b else {}, {m_id: 1},
                                      r_name='Exchange of %s' % m_name, m_id2c_id_b=m_id2c_id_b)
                 else:
                     s.setBoundaryCondition(b)

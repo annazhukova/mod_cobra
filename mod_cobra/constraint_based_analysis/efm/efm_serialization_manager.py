@@ -3,6 +3,7 @@ import logging
 
 import libsbml
 import openpyxl
+from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_yield
 
 from mod_sbml.utils.misc import invert_map
 from mod_cobra.constraint_based_analysis.efm.EFM import EFM
@@ -45,29 +46,6 @@ def get_pattern_sorter(id2pattern, p_id2efm_ids, sort=SORT_BY_EFM_NUMBER):
         return SIMPLE_PATTERN_SORTER
 
 
-def serialize_efms_xslx(sbml, id2efm, path, r_id2style=basic_r_style):
-    doc = libsbml.SBMLReader().readSBML(sbml)
-    model = doc.getModel()
-    wb = openpyxl.Workbook()
-    i = 0
-    for efm_id, efm in sorted(id2efm.iteritems(), key=lambda (_, efm): len(efm)):
-        r_id2coefficient = efm.to_r_id2coeff()
-        data, styles = [], []
-        for r_id in sorted(r_id2coefficient.iterkeys(), key=lambda r_id: (sorted(get_r_comps(r_id, model)), r_id)):
-            r = model.getReaction(r_id)
-            if not r:
-                raise ValueError('Reaction with id %s was not found in the model %s' % (r_id, model.getId()))
-            comps = ", ".join(sorted((c.name if c.name else c.id for c in
-                                      (model.getCompartment(c_id) for c_id in get_r_comps(r_id, model)))))
-            data.append([r_id2coefficient[r_id], r.id, r.name, get_sbml_r_formula(model, r, False), get_kegg_r_id(r),
-                         comps])
-            styles.append(r_id2style(r.id))
-        save_data(["Coefficient", "Id", "Name", "Formula", "Kegg", "Compartments"], data=data,
-                  ws_name="EM%d_%d" % (efm_id, len(efm)), wb=wb, ws_index=i, styles=styles)
-        i += 1
-    wb.save(path)
-
-
 def serialize_efms_txt(id2efm, path, efm_id2efficiency, all_efm_intersection):
     with open(path, 'w+') as f:
         f.write('Found %d EFMs:\n--------------------------------------------------------------\n\n' % len(id2efm))
@@ -82,39 +60,51 @@ def serialize_efms_txt(id2efm, path, efm_id2efficiency, all_efm_intersection):
 
 
 def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, path, efm_id2efficiency, fm_id2efficiency,
-                      all_efm_intersection, model):
+                      all_efm_intersection, model, r_id, r_rev, in_r_id, in_r_rev):
     with open(path, 'w+') as f:
         f.write('Found %d EFMs, grouped into %d FMs:\n==============================================================\n\n'
                 % (len(id2efm), len(id2fm)))
         if all_efm_intersection and len(all_efm_intersection):
-            f.write(('Intersection of all EFMs has length %d:\n\t%s.\n'
+            f.write(('All EFMs contain the following %d reactions:\n\t%s.\n'
                      % (len(all_efm_intersection), all_efm_intersection.to_string(binary=True))) +
                     '==============================================================\n\n')
         for fm_id in sorted(id2fm.iterkeys()):
             fm = id2fm[fm_id]
             m_id2st = fm_id2key[fm_id]
             efm_ids = key2efm_ids[m_id2st]
-            f.write('FM %d of length %d of efficiency %g.\n\n' % (fm_id, len(fm), fm_id2efficiency[fm_id]))
+            yield_str = '' if not in_r_id else ' of yield %g' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev)
+            if len(efm_ids) == 1:
+                efm_id = next(iter(efm_ids))
+                efm = id2efm[efm_id]
+
+                f.write('EFM %s (a.k.a. FM %s) of length %d of efficiency %g%s.\n\n'
+                        % (efm_id, fm_id, len(efm), efm_id2efficiency[efm_id], yield_str))
+            else:
+                f.write('FM %s of length %d of efficiency %g%s.\n\n'
+                        % (fm_id, len(fm), fm_id2efficiency[fm_id], yield_str))
             f.write('Inputs: %s;\n' % ', '.join('%g %s (%s)' % (-st, model.getSpecies(m_id).getName(), m_id)
                                                 for (m_id, st) in m_id2st if st < 0))
             f.write('Outputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
                                                  for (m_id, st) in m_id2st if st > 0))
             f.write('Structure: %s\n\n' % fm.to_string(subpattern=all_efm_intersection))
-            f.write('Contains %d EFM%s:\n\n' % (len(efm_ids), 's' if len(efm_ids) != 1 else ''))
-            for efm_id in efm_ids:
-                efm = id2efm[efm_id]
-                f.write('\tEFM %d of length %d of efficiency %g:\n\t%s\n\n'
-                        % (efm_id, len(efm), efm_id2efficiency[efm_id], efm.to_string(subpattern=all_efm_intersection)))
+            if len(efm_ids) > 1:
+                f.write('Contains %d EFM%s:\n\n' % (len(efm_ids), 's' if len(efm_ids) != 1 else ''))
+                for efm_id in efm_ids:
+                    efm = id2efm[efm_id]
+                    yield_str = '' if not in_r_id else ' of yield %g' % get_fm_yield(efm, r_id, in_r_id, r_rev, in_r_rev)
+                    f.write('\tEFM %s of length %d of efficiency %g%s:\n\n\t%s\n\n\n'
+                            % (efm_id, len(efm), efm_id2efficiency[efm_id], yield_str,
+                               efm.to_string(subpattern=all_efm_intersection)))
             f.write('-------------------------------------------------------------\n\n')
 
 
 def serialize_communities(id2cluster, id2intersection, id2imp_rns, total_len, all_efm_intersection, path):
     with open(path, 'w+') as f:
-        f.write('Analysed %d EFMs\n--------------------------------------------------------------\n\n' % total_len)
+        f.write('Analysed %d EFMs\n-------------------------------------------------------------------\n\n' % total_len)
         if all_efm_intersection and len(all_efm_intersection):
-            f.write(('Intersection of all EFMs has length %d:\n\t%s.\n'
+            f.write(('All EFMs contain the following %d reactions:\n\n\t%s.\n\n'
                      % (len(all_efm_intersection), all_efm_intersection.to_string(binary=True))) +
-                    '--------------------------------------------------------------\n\n')
+                    '===================================================================\n\n')
         f.write('Found %d communities\n--------------------------------------------------------------\n\n' %
                 len(id2cluster))
         all_r_ids = set(all_efm_intersection.to_r_id2coeff().iterkeys())
@@ -122,19 +112,14 @@ def serialize_communities(id2cluster, id2intersection, id2imp_rns, total_len, al
             cluster = id2cluster[clu_id]
             intersection = id2intersection[clu_id]
             imp_rns = id2imp_rns[clu_id]
-            f.write('Community %d of length %d:\n\t%s\n\tIntersection: %s\n\tOther reactions that belong to the same reaction community: %s\n\n'
-                    % (clu_id, len(cluster), ', '.join(str(it) for it in cluster),
-                       intersection.to_string(binary=True, subpattern=all_efm_intersection),
-                       imp_rns.to_string(binary=True, subpattern=intersection, show_subpattern=False,
-                                         key=lambda r_id: (0 if r_id in all_r_ids else 1, r_id))))
-
-
-def serialize_n_most_effective_efms_txt(id2efm, id2efficiency, n, path):
-    with open(path, 'w+') as f:
-        f.write('%d most effective EFMs:\n-----------------\n\n' % n)
-        for efm_id, efficiency in sorted(id2efficiency.iteritems(), key=lambda (_, eff): -eff)[0:n]:
-            efm = id2efm[efm_id]
-            f.write('EFM %d,\tefficiency=%g:\t%s\n\n' % (efm_id, efficiency, efm))
+            f.write('Community %d contains %d following EFMs:\n\n\t%s\n\n'
+                    % (clu_id, len(cluster), ', '.join(sorted(cluster))))
+            f.write('all of which contain the following reactions:\n\n\t%s\n\n'
+                    % (intersection.to_string(binary=True, subpattern=all_efm_intersection)))
+            f.write(('which form a reaction community, which also contains the following reactions:\n\n\t %s\n\n' +
+                     '--------------------------------------------------------------\n\n') %
+                    imp_rns.to_string(binary=True, subpattern=intersection, show_subpattern=False,
+                                     key=lambda r_id: (0 if r_id in all_r_ids else 1, r_id)))
 
 
 def read_efms(output_efm_file, r_ids, rev_r_ids):
@@ -168,26 +153,6 @@ def r_ids2sbml(r_ids, sbml, out_sbml, suffix='', r_updater=lambda r: True):
     libsbml.SBMLWriter().writeSBMLToFile(doc, out_sbml)
 
 
-def serialize_acom_patterns(clusters, output_file, sbml, r_id2style=basic_r_style):
-    doc = libsbml.SBMLReader().readSBML(sbml)
-    model = doc.getModel()
-    wb = openpyxl.Workbook()
-    i = 0
-    for motif in clusters.iterkeys():
-        data, styles = [], []
-        for (direction, r_id) in motif:
-            r = model.getReaction(r_id)
-            if not r:
-                raise ValueError('Reaction with id %s was not found in the model %s' % (r_id, model.getId()))
-            data.append([r.id, r.name, get_sbml_r_formula(model, r, False), direction])
-            styles.append(r_id2style(r.id))
-        save_data(["Id", "Name", "Formula", "Direction"],
-                  data, wb, "Motif_%d_%d_%d.xlsx" % (i, len(motif), len(clusters[motif])), i,
-                  styles=styles)
-        i += 1
-    wb.save(output_file)
-
-
 def serialize_important_reactions(r_id2efm_ids, model, output_file, imp_rn_threshold=0):
     len2r_ids = defaultdict(list)
     for r_id, efm_ids in r_id2efm_ids.iteritems():
@@ -218,7 +183,7 @@ def serialize_pattern(p_id, pattern, efm_ids, model, output_file):
     with open(output_file, 'w+') as f:
         r_id2coeff = pattern.to_r_id2coeff(binary=True)
         f.write('Pattern %d of length %d found in %d EFMs:\n\t%s\n------------------\n\n'
-                % (p_id, len(r_id2coeff), len(efm_ids), ', '.join((str(it) for it in efm_ids))))
+                % (p_id, len(r_id2coeff), len(efm_ids), ', '.join(sorted(efm_ids))))
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
             for r_id in sorted(r_ids):
@@ -227,7 +192,7 @@ def serialize_pattern(p_id, pattern, efm_ids, model, output_file):
             f.write('\n')
 
 
-def serialize_clique(cl_id, clique, model, output_file):
+def serialize_clique(cl_id, clique, efm_ids, model, output_file):
     """
     Serializes a clique to a file.
 
@@ -239,7 +204,8 @@ def serialize_clique(cl_id, clique, model, output_file):
     """
     with open(output_file, 'w+') as f:
         r_id2coeff = clique.to_r_id2coeff(binary=True)
-        f.write('Clique %d of length %d\n------------------\n\n' % (cl_id, len(r_id2coeff)))
+        f.write('Clique %d of length %d found in %d EFMs:\n\t%s\n------------------\n\n'
+                % (cl_id, len(r_id2coeff), len(efm_ids), ', '.join(sorted(efm_ids))))
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
             for r_id in sorted(r_ids):
@@ -262,9 +228,9 @@ def serialize_community(c_id, community_intersection, imp_rns, efm_ids, model, o
         r_id2coeff = community_intersection.to_r_id2coeff(binary=True)
         imp_r_id2coeff = {r_id: coeff for (r_id, coeff) in imp_rns.to_r_id2coeff(binary=True).iteritems()
                           if r_id not in r_id2coeff}
-        f.write('Community %d of %d EFMs:\n%s\n------------------\n\n' % (c_id, len(efm_ids),
-                                                                          ', '.join(str(it) for it in sorted(efm_ids))))
-        f.write('Reactions that participate in all EFMs of this community (%d):\n------------------\n\n'
+        f.write('Community %d of %d following EFMs:\n\n\t%s\n\n------------------\n\n' % (c_id, len(efm_ids),
+                                                                                          ', '.join(sorted(efm_ids))))
+        f.write('Reactions that participate in all EFMs of this community (%d):\n\n------------------\n\n'
                 % len(r_id2coeff))
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
@@ -274,7 +240,8 @@ def serialize_community(c_id, community_intersection, imp_rns, efm_ids, model, o
                                                                            show_metabolite_ids=True)))
             f.write('\n')
         if imp_r_id2coeff:
-            f.write('\n------------------\nOther reactions that participate in the same reaction community (%d):\n------------------\n\n'
+            f.write('------------------\n\n')
+            f.write('Other reactions that participate in the same reaction community (%d):\n\n------------------\n\n'
                     % len(imp_r_id2coeff))
             coeff2r_id = invert_map(imp_r_id2coeff)
             for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
@@ -285,7 +252,7 @@ def serialize_community(c_id, community_intersection, imp_rns, efm_ids, model, o
                 f.write('\n')
 
 
-def serialize_fm(fm_id, fm, model, output_file, efficiency):
+def serialize_fm(fm_id, fm, model, output_file, efficiency, r_id, in_r_id, r_rev, in_r_rev):
     """
     Serializes a FM to a file.
 
@@ -297,7 +264,9 @@ def serialize_fm(fm_id, fm, model, output_file, efficiency):
     """
     with open(output_file, 'w+') as f:
         r_id2coeff = fm.to_r_id2coeff()
-        f.write('FM %d of length %d of efficiency %g\n------------------\n\n' % (fm_id, len(r_id2coeff), efficiency))
+        yield_str = '' if not in_r_id else ' of yield %g' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev)
+        f.write('FM %s of length %d of efficiency %g%s\n------------------\n\n'
+                % (fm_id, len(r_id2coeff), efficiency, yield_str))
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
             for r_id in sorted(r_ids):
@@ -329,7 +298,7 @@ def serialize_patterns(p_id2efm_ids, id2pattern, output_file, min_pattern_len, a
         efm_len = len(p_id2efm_ids[p_id])
         p_string = pattern.to_string(binary=True, subpattern=all_efm_intersection)
         f.write("Pattern %d of length %d:\n\t%s,\nfound in %d EFMs:\n\t%s\n\n"
-                % (p_id, p_length, p_string, efm_len, ', '.join(str(efm_id) for efm_id in p_id2efm_ids[p_id])))
+                % (p_id, p_length, p_string, efm_len, ', '.join(sorted(p_id2efm_ids[p_id]))))
 
     with open(output_file, 'w+') as f:
         f.write(('Found %d patterns of length >= %d, contained in at least %d EFMs.\n'
@@ -344,7 +313,7 @@ def serialize_patterns(p_id2efm_ids, id2pattern, output_file, min_pattern_len, a
             log_pattern(p_id, f)
 
 
-def serialize_cliques(id2clique, output_file, all_efm_intersection=None):
+def serialize_cliques(id2clique, cl_id2efm_ids, output_file):
     """
     Serializes cliques to a file, one clique per line. Cliques are represented as ids of the active reactions
     (for the reversed reactions, the id is preceded by minus), e.g. -R1 R3 -R7 R11 R25.
@@ -357,16 +326,14 @@ def serialize_cliques(id2clique, output_file, all_efm_intersection=None):
     def log_clique(cl_id, f):
         clique = id2clique[cl_id]
         cl_length = len(clique)
-        cl_string = clique.to_string(binary=True, subpattern=all_efm_intersection)
-        f.write("Clique %d of length %d:\n\t%s\n\n" % (cl_id, cl_length, cl_string))
+        cl_string = clique.to_string()
+        efm_ids = cl_id2efm_ids[cl_id]
+        f.write("Clique %d of length %d:\n\n\t%s\n\nfound in %d EFMs:\n\n\t%s\n\n---------------------------------------\n\n"
+                % (cl_id, cl_length, cl_string, len(efm_ids), ', '.join(sorted(efm_ids))))
 
     with open(output_file, 'w+') as f:
-        f.write('Found %d reaction cliques.\n--------------------------------------------------------------\n\n'
+        f.write('Found %d reaction cliques.\n======================================================================\n\n'
                 % len(id2clique))
-        if all_efm_intersection and len(all_efm_intersection):
-            f.write(('Intersection of all EFMs has length %d: %s.\n'
-                     % (len(all_efm_intersection), all_efm_intersection.to_string(binary=True))) +
-                    '--------------------------------------------------------------\n\n')
 
         for cl_id in sorted(id2clique.iterkeys()):
             log_clique(cl_id, f)

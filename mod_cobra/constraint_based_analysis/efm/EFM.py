@@ -183,6 +183,31 @@ class EFM(object):
                 i, cur_efm_part = process(r_id, cur_efm_part, i, True)
         return converted_efm
 
+    def get_sample_r_id_coefficient_pair(self, binary=False):
+        binary_efm_iterable = iter(self.binary_efm)
+        cur_efm_part = next(binary_efm_iterable)
+        coeff_iterable = iter(self.coefficients) if self.coefficients else None
+
+        def advance(i, cur_efm_part):
+            if math.log(i) == self.int_size:
+                cur_efm_part = next(binary_efm_iterable)
+                i = 1
+            else:
+                i <<= 1
+            return cur_efm_part, i
+
+        i = 1
+        for r_id in self.r_ids:
+            if cur_efm_part & i:
+                coeff = next(coeff_iterable) if self.coefficients else 1
+                return r_id, (1 if coeff > 0 else -1) if binary else coeff
+            cur_efm_part, i = advance(i, cur_efm_part)
+            if r_id in self.rev_r_ids:
+                if cur_efm_part & i:
+                    coeff = next(coeff_iterable) if self.coefficients else -1
+                    return r_id, (1 if coeff > 0 else -1) if binary else coeff
+                cur_efm_part, i = advance(i, cur_efm_part)
+
     def intersection(self, other):
         if not other or not isinstance(other, EFM):
             raise AttributeError('Other should be of type EFM')
@@ -191,6 +216,12 @@ class EFM(object):
             return self
         return EFM(binary_efm=binary_efm,
                    r_ids=self.r_ids, rev_r_ids=self.rev_r_ids, int_size=self.int_size)
+
+    def intersection_len(self, other):
+        if not other or not isinstance(other, EFM):
+            raise AttributeError('Other should be of type EFM')
+        binary_efm = tuple((p1 & p2 for (p1, p2) in zip(self.binary_efm, other.binary_efm)))
+        return get_binary_efm_len(binary_efm)
 
     def __len__(self):
         """

@@ -23,14 +23,11 @@ def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_
                 return None
         else:
             raise ValueError('No EFMs found :(. Probably, you forgot to specify TreeEFM path?')
-    return assign_ids_by_efficiency(efms, target_r_id, target_r_reversed)
 
+    efm2efficiency = {efm: get_fm_efficiency(efm, target_r_id, target_r_reversed) for efm in efms}
+    id2efm = dict(zip((str(it) for it in xrange(0, len(efms))), sorted(efms, key=lambda efm: -efm2efficiency[efm])))
 
-def assign_ids_by_efficiency(fms, target_r_id, target_r_rev):
-    fm2efficiency = {fm: get_fm_efficiency(fm, target_r_id, target_r_rev) for fm in fms}
-    id2fm = dict(zip(xrange(0, len(fms)), sorted(fms, key=lambda fm: -fm2efficiency[fm])))
-    fm_id2efficiency = {fm_id: fm2efficiency[fm] for (fm_id, fm) in id2fm.iteritems()}
-    return id2fm, fm_id2efficiency
+    return id2efm, {efm_id: efm2efficiency[efm] for (efm_id, efm) in id2efm.iteritems()}
 
 
 def group_efms(id2efm, model, target_r_id, target_r_rev):
@@ -40,8 +37,13 @@ def group_efms(id2efm, model, target_r_id, target_r_rev):
         key2efm_ids[m_id2stoichiometry].append(efm_id)
     fm2key = {id2efm[efm_ids[0]].join([id2efm[efm_id] for efm_id in efm_ids[1:]]): key
               for (key, efm_ids) in key2efm_ids.iteritems()}
-    id2fm, fm_id2efficiency = assign_ids_by_efficiency(fm2key.keys(), target_r_id, target_r_rev)
-    return id2fm, fm_id2efficiency, {fm_id: fm2key[fm] for (fm_id, fm) in id2fm.iteritems()}, key2efm_ids
+
+    fm2efficiency = {fm: get_fm_efficiency(fm, target_r_id, target_r_rev) for fm in fm2key.iterkeys()}
+    id2fm = dict(zip((str(it) for it in xrange(0, len(fm2key))),
+                     sorted(fm2key.iterkeys(), key=lambda fm: (-fm2efficiency[fm], min(key2efm_ids[fm2key[fm]])))))
+
+    return id2fm, {fm_id: fm2efficiency[fm] for (fm_id, fm) in id2fm.iteritems()}, \
+           {fm_id: fm2key[fm] for (fm_id, fm) in id2fm.iteritems()}, key2efm_ids
 
 
 def calculate_imp_rn_threshold(total_len, imp_rn_threshold=None):
