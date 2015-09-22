@@ -62,7 +62,7 @@ def serialize_efms_txt(id2efm, path, efm_id2efficiency, all_efm_intersection):
 def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, path, efm_id2efficiency, fm_id2efficiency,
                       all_efm_intersection, model, r_id, r_rev, in_r_id, in_r_rev):
     with open(path, 'w+') as f:
-        f.write('Found %d EFMs, grouped into %d FMs:\n==============================================================\n\n'
+        f.write('Found %d EFMs, grouped into %d pathways:\n==============================================================\n\n'
                 % (len(id2efm), len(id2fm)))
         if all_efm_intersection and len(all_efm_intersection):
             f.write(('All EFMs contain the following %d reactions:\n\t%s.\n'
@@ -77,10 +77,10 @@ def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, path, efm_id2effici
                 efm_id = next(iter(efm_ids))
                 efm = id2efm[efm_id]
 
-                f.write('EFM %s (a.k.a. FM %s) of length %d of efficiency %g%s.\n\n'
+                f.write('EFM %s (a.k.a. pathway %s) of length %d of efficiency %g%s.\n\n'
                         % (efm_id, fm_id, len(efm), efm_id2efficiency[efm_id], yield_str))
             else:
-                f.write('FM %s of length %d of efficiency %g%s.\n\n'
+                f.write('Pathway %s of length %d of efficiency %g%s.\n\n'
                         % (fm_id, len(fm), fm_id2efficiency[fm_id], yield_str))
             f.write('Inputs: %s;\n' % ', '.join('%g %s (%s)' % (-st, model.getSpecies(m_id).getName(), m_id)
                                                 for (m_id, st) in m_id2st if st < 0))
@@ -98,25 +98,26 @@ def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, path, efm_id2effici
             f.write('-------------------------------------------------------------\n\n')
 
 
-def serialize_communities(id2cluster, id2intersection, id2imp_rns, total_len, all_efm_intersection, path):
+def serialize_communities(id2cluster, id2intersection, id2imp_rns, total_len, all_fm_intersection, path):
     with open(path, 'w+') as f:
-        f.write('Analysed %d EFMs\n-------------------------------------------------------------------\n\n' % total_len)
-        if all_efm_intersection and len(all_efm_intersection):
-            f.write(('All EFMs contain the following %d reactions:\n\n\t%s.\n\n'
-                     % (len(all_efm_intersection), all_efm_intersection.to_string(binary=True))) +
+        f.write('Analysed %d pathways\n-------------------------------------------------------------------\n\n'
+                % total_len)
+        if all_fm_intersection and len(all_fm_intersection):
+            f.write(('All pathways contain following %d reactions:\n\n\t%s.\n\n'
+                     % (len(all_fm_intersection), all_fm_intersection.to_string(binary=True))) +
                     '===================================================================\n\n')
         f.write('Found %d communities\n--------------------------------------------------------------\n\n' %
                 len(id2cluster))
-        all_r_ids = set(all_efm_intersection.to_r_id2coeff().iterkeys())
+        all_r_ids = set(all_fm_intersection.to_r_id2coeff().iterkeys())
         for clu_id in sorted(id2cluster.iterkeys()):
             cluster = id2cluster[clu_id]
             intersection = id2intersection[clu_id]
             imp_rns = id2imp_rns[clu_id]
-            f.write('Community %d contains %d following EFMs:\n\n\t%s\n\n'
+            f.write('Community %d contains %d following pathways:\n\n\t%s\n\n'
                     % (clu_id, len(cluster), ', '.join(sorted(cluster))))
-            f.write('all of which contain the following reactions:\n\n\t%s\n\n'
-                    % (intersection.to_string(binary=True, subpattern=all_efm_intersection)))
-            f.write(('which form a reaction community, which also contains the following reactions:\n\n\t %s\n\n' +
+            f.write('all of which contain following reactions:\n\n\t%s\n\n'
+                    % (intersection.to_string(binary=True, subpattern=all_fm_intersection)))
+            f.write(('which form a reaction community, which also contains following reactions:\n\n\t %s\n\n' +
                      '--------------------------------------------------------------\n\n') %
                     imp_rns.to_string(binary=True, subpattern=intersection, show_subpattern=False,
                                      key=lambda r_id: (0 if r_id in all_r_ids else 1, r_id)))
@@ -204,7 +205,7 @@ def serialize_clique(cl_id, clique, efm_ids, model, output_file):
     """
     with open(output_file, 'w+') as f:
         r_id2coeff = clique.to_r_id2coeff(binary=True)
-        f.write('Clique %d of length %d found in %d EFMs:\n\t%s\n------------------\n\n'
+        f.write('Reaction group %d of length %d found in %d EFMs:\n\t%s\n------------------\n\n'
                 % (cl_id, len(r_id2coeff), len(efm_ids), ', '.join(sorted(efm_ids))))
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
@@ -265,7 +266,7 @@ def serialize_fm(fm_id, fm, model, output_file, efficiency, r_id, in_r_id, r_rev
     with open(output_file, 'w+') as f:
         r_id2coeff = fm.to_r_id2coeff()
         yield_str = '' if not in_r_id else ' of yield %g' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev)
-        f.write('FM %s of length %d of efficiency %g%s\n------------------\n\n'
+        f.write('Pathway %s of length %d of efficiency %g%s\n------------------\n\n'
                 % (fm_id, len(r_id2coeff), efficiency, yield_str))
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
@@ -328,11 +329,11 @@ def serialize_cliques(id2clique, cl_id2efm_ids, output_file):
         cl_length = len(clique)
         cl_string = clique.to_string()
         efm_ids = cl_id2efm_ids[cl_id]
-        f.write("Clique %d of length %d:\n\n\t%s\n\nfound in %d EFMs:\n\n\t%s\n\n---------------------------------------\n\n"
+        f.write("Reaction group %d of length %d:\n\n\t%s\n\nfound in %d EFMs:\n\n\t%s\n\n---------------------------------------\n\n"
                 % (cl_id, cl_length, cl_string, len(efm_ids), ', '.join(sorted(efm_ids))))
 
     with open(output_file, 'w+') as f:
-        f.write('Found %d reaction cliques.\n======================================================================\n\n'
+        f.write('Found %d coupled reaction groups.\n======================================================================\n\n'
                 % len(id2clique))
 
         for cl_id in sorted(id2clique.iterkeys()):

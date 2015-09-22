@@ -1,11 +1,11 @@
 <div class="mediabox">
-    <h3>Reaction cliques</h3>
+    <h3>Coupled reactions</h3>
     {% if clique_num %}
-        <p>Detected <b>{{clique_num}}</b> cliques
+        <p>Detected <b>{{clique_num}}</b> coupled reaction groups
             (<a href="{{description_filepath}}" target="_blank">detailed description</a>).</p>
 
         {{selected_clique_block}}
     {% else %}
-        <p>Did not detect any cliques.</p>
+        <p>Did not detect any coupled reactions.</p>
     {% endif %}
 </div>

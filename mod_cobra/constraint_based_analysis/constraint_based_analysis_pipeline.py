@@ -29,7 +29,6 @@ from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
 from model_comparison.model_merger import merge_models
-from submodel_manager import remove_unused_species
 
 __author__ = 'anna'
 
@@ -177,22 +176,21 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             id2fm, fm_id2efficiency, fm_id2key, key2efm_ids = group_efms(id2efm, model, out_r_id, out_rev)
             fm_num = len(id2fm)
 
+            all_fm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2fm.itervalues(),
+                                         next(id2fm.itervalues()))
+
             all_efm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2efm.itervalues(),
                                           next(id2efm.itervalues()))
-            all_efm_intersection_len = len(all_efm_intersection)
-
-            if all_efm_intersection_len:
+            if len(all_efm_intersection):
                 update_vis_layers(all_efm_intersection.to_r_id2coeff(binary=True),
                                   'EFM intersection', r_id2mask, layer2mask, mask_shift, vis_r_ids)
                 if not main_layer:
                     main_layer = 'EFM intersection'
                 mask_shift += 1
 
-            logging.info('Detected %d EFMs with common part of length %d.' % (efm_num, all_efm_intersection_len))
-
-            all_efm_file = os.path.join(efm_dir, 'efms.txt')
+            all_fm_file = os.path.join(efm_dir, 'pathways.txt')
             in_r_id, in_r_rev = next(in_r_id2rev.iteritems()) if in_r_id2rev else (None, False)
-            serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, all_efm_file, efm_id2efficiency, fm_id2efficiency,
+            serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, all_fm_file, efm_id2efficiency, fm_id2efficiency,
                               all_efm_intersection, model, out_r_id, out_rev, in_r_id, in_r_rev)
 
             # 3 most effective FMs
@@ -200,20 +198,20 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             mask_shift, fms \
                 = process_n_fms(directory=efm_dir, id2fm=id2fm, id2mask=r_id2mask,
                                 layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
-                                name='FM', sorter=lambda (fm_id, _): -fm_id2efficiency[fm_id],
+                                name='pathway', sorter=lambda (fm_id, _): -fm_id2efficiency[fm_id],
                                 serializer=lambda fm_id, efm_txt:
                                 serialize_fm(fm_id, id2fm[fm_id], model, efm_txt, fm_id2efficiency[fm_id],
                                              out_r_id, in_r_id, out_rev, in_r_rev),
                                 suffix=lambda _: '', get_f_path=get_f_path, limit=limit, update_vis=True)
             fm_block = describe('fm_block.html', element_num=limit, characteristics='most effective',
-                                element_name='FM', fms=fms)
+                                element_name='pathway', fms=fms)
             description += describe('efms.html', efm_num=efm_num, fm_num=fm_num,
-                                    description_filepath=get_f_path(all_efm_file), selected_efm_block=fm_block)
+                                    description_filepath=get_f_path(all_fm_file), selected_efm_block=fm_block)
 
             # Communities
             comm_dir = os.path.join(efm_dir, 'communities')
             create_dirs(comm_dir)
-            id2cluster = detect_fm_communities(id2fm, threshold=all_efm_intersection_len)
+            id2cluster = detect_fm_communities(id2fm, threshold=len(all_fm_intersection))
             id2intersection = {cl_id: reduce(lambda p1, p2: p1.intersection(p2),
                                              (id2fm[fm_id] for fm_id in cluster), id2fm[cluster[0]])
                                for (cl_id, cluster) in id2cluster.iteritems()}
@@ -223,8 +221,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
                           for (cl_id, cluster) in id2cluster.iteritems()}
             if id2cluster:
                 comm_txt = os.path.join(comm_dir, 'communities.txt')
-                serialize_communities(id2cluster, id2intersection, id2imp_rns, fm_num,
-                                      all_efm_intersection, comm_txt)
+                serialize_communities(id2cluster, id2intersection, id2imp_rns, fm_num, all_fm_intersection, comm_txt)
                 # All clusters
                 limit = len(id2cluster)
                 mask_shift, fms \
@@ -251,24 +248,24 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
 
 def process_cliques(res_dir, get_f_path, id2efm, id2mask, in_sbml, model, vis_r_ids, id2color=None):
     clique_merged_sbml = in_sbml
-    clique_dir = os.path.join(res_dir, 'cliques')
+    clique_dir = os.path.join(res_dir, 'coupled_reactions')
     create_dirs(clique_dir)
     id2clique, cl_id2efm_ids = detect_cliques(id2efm)
     if id2clique:
-        cliques_txt = os.path.join(clique_dir, 'cliques.txt')
+        cliques_txt = os.path.join(clique_dir, 'coupled_reactions.txt')
         serialize_cliques(id2clique, cl_id2efm_ids, cliques_txt)
         # 5 longest cliques
         limit = min(5, len(id2clique))
         _, fms \
             = process_n_fms(directory=clique_dir, id2fm=id2clique, id2mask=id2mask, layer2mask=None, mask_shift=0,
-                            vis_r_ids=None, name='clique', sorter=lambda (_, cl): -len(cl),
+                            vis_r_ids=None, name='reaction group', sorter=lambda (_, cl): -len(cl),
                             serializer=lambda cl_id, clique_txt:
                             serialize_clique(cl_id, id2clique[cl_id], cl_id2efm_ids[cl_id], model, clique_txt),
                             suffix=lambda _: '', limit=limit, get_f_path=get_f_path, update_vis=False)
         fm_block = describe('fm_block.html', element_num=limit, characteristics='longest',
-                            element_name='clique', fms=fms, all=limit == len(id2clique))
+                            element_name='coupled reaction group', fms=fms, all=limit == len(id2clique))
 
-        clique_merged_sbml = os.path.join(clique_dir, 'Model_clique_merged.xml')
+        clique_merged_sbml = os.path.join(clique_dir, 'Model_lumped.xml')
         r_id2cl_id = clique2lumped_reaction(id2clique, in_sbml, clique_merged_sbml)
         vis_r_ids |= {cl_id for ((r_id, _), cl_id) in r_id2cl_id.iteritems() if r_id in vis_r_ids}
         for (r_id, coeff), cl_id in r_id2cl_id.iteritems():
@@ -293,7 +290,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
     tab2html = {}
     layer2mask = {}
 
-    get_f_path = lambda f: os.path.join('..', '..', os.path.relpath(f, res_dir))
+    get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
 
     invisible_layers = []
     sbml2id2efm = {}
@@ -315,99 +312,92 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         sbml2vis_r_ids[sbml] = r_ids
         sbml2name[sbml] = name
 
-    mm_dir = os.path.join(res_dir, 'merged_model')
-    create_dirs(mm_dir)
-    visualize_merged_model(get_f_path, invisible_layers, layer2mask, mm_dir, sbml2id2mask, sbml2parameters.keys(),
-                           sbml2name, sbml2vis_r_ids, sbml2id2efm, tab2html)
-
-    # mm_dir = os.path.join(res_dir, 'merged_clique_model')
-    # create_dirs(mm_dir)
-    # visualize_merged_model(get_f_path, invisible_layers, layer2mask, mm_dir, sbml2id2mask, sbml2cl_sbml.values(),
-    #                        sbml2name, sbml2vis_r_ids, tab2html)
-
-
-def visualize_merged_model(get_f_path, invisible_layers, layer2mask, res_dir, sbml2id2mask, sbml_files, sbml2name,
-                           sbml2vis_r_ids, sbml2id2efm, tab2html):
-    if not sbml_files:
-        return
-    info = ''
-    id2color = None
-    model = None
-    if len(sbml_files) > 1:
-        merged_sbml = os.path.join(res_dir, 'Merged_model.xml')
-        sbml2id2id, sbml2rev_r_ids, common_ids = merge_models(sbml_files, merged_sbml, sbml2name)
-        doc = libsbml.SBMLReader().readSBML(merged_sbml)
-        model = doc.getModel()
-        r_ids = sorted((r.getId() for r in model.getListOfReactions()))
-        rev_r_ids = {r.getId() for r in model.getListOfReactions() if r.getReversible()}
-
-        if common_ids:
-            logging.info('Merged all the models into %s.' % merged_sbml)
-            comparison_prefix = os.path.join(res_dir, 'Model_comparison_')
-            (cc_num, cm_num, cr_num), (comp_csv, m_csv, r_csv) = \
-                serialize_common_part_to_csv(merged_sbml, sbml2id2id, common_ids,
-                                             {sbml: sbml2name[sbml] for sbml in sbml_files},
-                                             comparison_prefix)
-        else:
-            cc_num, cm_num, cr_num = 0, 0, 0
-        tab2html['Model comparison'] = \
-            describe('model_comparison.html', c_num=cc_num, m_num=cm_num, r_num=cr_num,
-                     c_csv=get_f_path(comp_csv) if cc_num else None,
-                     m_csv=get_f_path(m_csv) if cm_num else None,
-                     r_csv=get_f_path(r_csv) if cr_num else None), None
-        id2mask = defaultdict(lambda: 0)
-        vis_r_ids = set()
-        id2efm = {}
-        for sbml in sbml_files:
-            id2mask.update({(t_id, t_coeff): id2mask[(t_id, t_coeff)] | mask
-                            for (t_id, t_coeff, mask) in
-                            ((sbml2id2id[sbml][s_id], coeff if s_id not in sbml2rev_r_ids[sbml] else -coeff, mask)
-                            for ((s_id, coeff), mask) in sbml2id2mask[sbml].iteritems() if s_id in sbml2id2id[sbml])})
-            vis_r_ids |= {sbml2id2id[sbml][r_id] for r_id in sbml2vis_r_ids[sbml] if r_id in sbml2id2id[sbml]}
-            id2efm.update({'%s_%s' % (sbml2name[sbml], efm_id): efm.translate(sbml2id2id[sbml], r_ids, rev_r_ids)
-                           for (efm_id, efm) in sbml2id2efm[sbml].iteritems()})
-
-        colors = get_n_colors(len(sbml_files) + 1, 0.5, 0.8)
-        if common_ids:
-            mixed_color = colors[0]
-            r, g, b = mixed_color
-            info = describe('color.html', r=r, g=g, b=b, name='common reactions/metabolites')
-        sbml2color = dict(zip(sbml2id2id.iterkeys(), colors[1:]))
-        id2color = {}
-        for sbml, id2id in sbml2id2id.iteritems():
-            color = sbml2color[sbml]
-            r, g, b = color
-            id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.itervalues()})
-            info += describe('color.html', r=r, g=g, b=b, name=sbml2name[sbml])
-            title = 'Combined model analysis'
+    if len(sbml2parameters) > 1:
+        mm_dir = os.path.join(res_dir, 'merged_model')
+        create_dirs(mm_dir)
+        id2color, id2efm, id2mask, info, sbml, model, vis_r_ids = \
+            join_models(get_f_path, mm_dir, sbml2id2efm, sbml2id2mask, sbml2name, sbml2vis_r_ids,
+                        sbml2parameters.keys(), tab2html)
+        title = 'Combined model analysis'
     else:
-        merged_sbml = next(iter(sbml_files))
-        vis_r_ids = sbml2vis_r_ids[merged_sbml]
-        id2mask = sbml2id2mask[merged_sbml]
-        id2efm = sbml2id2efm[merged_sbml]
+        sbml = next(sbml2parameters.iterkeys())
+        vis_r_ids = sbml2vis_r_ids[sbml]
+        id2mask = sbml2id2mask[sbml]
+        id2efm = sbml2id2efm[sbml]
+        id2color = None
+        info = ''
         title = 'Model analysis'
 
     if id2efm:
-        if not model:
-            doc = libsbml.SBMLReader().readSBML(merged_sbml)
-            model = doc.getModel()
-        clique_merged_sbml, description = \
-            process_cliques(res_dir, get_f_path, id2efm, id2mask, merged_sbml, model, vis_r_ids, id2color)
+        doc = libsbml.SBMLReader().readSBML(sbml)
+        model = doc.getModel()
+        sbml, description = process_cliques(res_dir, get_f_path, id2efm, id2mask, sbml, model, vis_r_ids, id2color)
         if 'Model comparison' in tab2html:
             tab2html['Model comparison'] = tab2html['Model comparison'][0] + description, None
         else:
-            tab2html['Reaction cliques'] = description, None
-    else:
-        clique_merged_sbml = merged_sbml
+            tab2html['Coupled reactions'] = description, None
 
+    visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html)
+
+
+def visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html):
     combined_sbml = os.path.join(res_dir, 'Combined_model.xml')
-    r_ids2sbml(vis_r_ids, clique_merged_sbml, combined_sbml, 'combined')
+    r_ids2sbml(vis_r_ids, sbml, combined_sbml, 'combined')
     doc = libsbml.SBMLReader().readSBML(combined_sbml)
     model = doc.getModel()
     id2mask = get_full_id2mask(id2mask, model)
     process_sbml(combined_sbml, verbose=True, path='visualization', generalize=False,
                  id2mask=id2mask, layer2mask=layer2mask, tab2html=tab2html, title=title,
                  id2color=id2color, tabs=None, info=info, invisible_layers=invisible_layers)
+
+
+def join_models(get_f_path, res_dir, sbml2id2efm, sbml2id2mask, sbml2name, sbml2vis_r_ids,
+                sbml_files, tab2html):
+    merged_sbml = os.path.join(res_dir, 'Merged_model.xml')
+    sbml2id2id, sbml2rev_r_ids, common_ids = merge_models(sbml_files, merged_sbml, sbml2name)
+    doc = libsbml.SBMLReader().readSBML(merged_sbml)
+    model = doc.getModel()
+    r_ids = sorted((r.getId() for r in model.getListOfReactions()))
+    rev_r_ids = {r.getId() for r in model.getListOfReactions() if r.getReversible()}
+    if common_ids:
+        logging.info('Merged all the models into %s.' % merged_sbml)
+        comparison_prefix = os.path.join(res_dir, 'Model_comparison_')
+        (cc_num, cm_num, cr_num), (comp_csv, m_csv, r_csv) = \
+            serialize_common_part_to_csv(merged_sbml, sbml2id2id, common_ids,
+                                         {sbml: sbml2name[sbml] for sbml in sbml_files},
+                                         comparison_prefix)
+    else:
+        cc_num, cm_num, cr_num = 0, 0, 0
+    tab2html['Model comparison'] = \
+        describe('model_comparison.html', c_num=cc_num, m_num=cm_num, r_num=cr_num,
+                 c_csv=get_f_path(comp_csv) if cc_num else None,
+                 m_csv=get_f_path(m_csv) if cm_num else None,
+                 r_csv=get_f_path(r_csv) if cr_num else None), None
+    id2mask = defaultdict(lambda: 0)
+    vis_r_ids = set()
+    id2efm = {}
+    for sbml in sbml_files:
+        id2mask.update({(t_id, t_coeff): id2mask[(t_id, t_coeff)] | mask
+                        for (t_id, t_coeff, mask) in
+                        ((sbml2id2id[sbml][s_id], coeff if s_id not in sbml2rev_r_ids[sbml] else -coeff, mask)
+                         for ((s_id, coeff), mask) in sbml2id2mask[sbml].iteritems() if s_id in sbml2id2id[sbml])})
+        vis_r_ids |= {sbml2id2id[sbml][r_id] for r_id in sbml2vis_r_ids[sbml] if r_id in sbml2id2id[sbml]}
+        id2efm.update({'%s_%s' % (sbml2name[sbml], efm_id): efm.translate(sbml2id2id[sbml], r_ids, rev_r_ids)
+                       for (efm_id, efm) in sbml2id2efm[sbml].iteritems()})
+    colors = get_n_colors(len(sbml_files) + 1, 0.5, 0.8)
+    if common_ids:
+        mixed_color = colors[0]
+        r, g, b = mixed_color
+        info = describe('color.html', r=r, g=g, b=b, name='common reactions/metabolites')
+    sbml2color = dict(zip(sbml2id2id.iterkeys(), colors[1:]))
+    id2color = {}
+    info = ''
+    for sbml, id2id in sbml2id2id.iteritems():
+        color = sbml2color[sbml]
+        r, g, b = color
+        id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.itervalues()})
+        info += describe('color.html', r=r, g=g, b=b, name=sbml2name[sbml])
+    return id2color, id2efm, id2mask, info, merged_sbml, model, vis_r_ids
 
 
 def update_vis_layers(r_id2val, layer, id2mask, layer2mask, mask_shift, vis_r_ids):
@@ -440,7 +430,7 @@ def process_n_fms(directory, id2fm, id2mask, layer2mask, mask_shift, vis_r_ids,
     for fm_id, fm in sorted(id2fm.iteritems(), key=sorter):
         r_id2coeff = fm.to_r_id2coeff()
         c_name = name[0].upper() + name[1:]
-        fm_name = '%s_%s_of_len_%d' % (c_name, str(fm_id), len(fm))
+        fm_name = '%s_%s_of_len_%d' % (c_name.replace(' ', '_'), str(fm_id), len(fm))
         fm_txt = os.path.join(sbml_dir, '%s.txt' % fm_name)
         serializer(fm_id, fm_txt)
         fms.append((c_name, fm_id, len(fm), suffix(fm_id), get_f_path(fm_txt)))
