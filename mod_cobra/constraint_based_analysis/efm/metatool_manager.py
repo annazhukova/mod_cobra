@@ -231,7 +231,6 @@ def convert_metatool_output2efm(metatool_file, in_dat=None, r_rev_ids=None, r_ir
     if not r_irrev_ids and not r_rev_ids:
         raise ValueError('You should either specify the reaction lists or the in_dat file!')
     sorted_r_ids = r_rev_ids + r_irrev_ids
-    r_rev_ids = set(r_rev_ids)
     efms = []
     with open(metatool_file, 'r') as f:
         line = next(f)
@@ -247,7 +246,7 @@ def convert_metatool_output2efm(metatool_file, in_dat=None, r_rev_ids=None, r_ir
                 coefficients = re.findall(r"[-+]?\d*\.*\d+", line)
                 r_id2coefficient = {r_id: float(c) for (r_id, c) in zip(sorted_r_ids, coefficients) if float(c) != 0}
                 if not r_id or r_id in r_id2coefficient:
-                    efms.append(EFM(r_id2coeff=r_id2coefficient, r_ids=sorted_r_ids, rev_r_ids=r_rev_ids))
+                    efms.append(EFM(r_id2coeff=r_id2coefficient))
             line = next(f)
     return efms
 

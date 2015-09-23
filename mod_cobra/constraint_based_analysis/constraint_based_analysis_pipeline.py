@@ -216,7 +216,9 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
                                              (id2fm[fm_id] for fm_id in cluster), id2fm[cluster[0]])
                                for (cl_id, cluster) in id2cluster.iteritems()}
             imp_fraction = 60
-            id2imp_rns = {cl_id: detect_reaction_community({fm_id: id2fm[fm_id] for fm_id in cluster},
+            r_ids = [r.getId() for r in model.getListOfReactions()]
+            rev_r_ids = [r.getId() for r in model.getListOfReactions() if r.getReversible()]
+            id2imp_rns = {cl_id: detect_reaction_community(r_ids, rev_r_ids, {fm_id: id2fm[fm_id] for fm_id in cluster},
                                                            imp_fraction, id2intersection[cl_id])
                           for (cl_id, cluster) in id2cluster.iteritems()}
             if id2cluster:

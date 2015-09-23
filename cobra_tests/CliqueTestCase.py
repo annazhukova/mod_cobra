@@ -32,7 +32,7 @@ class CliqueTestCase(unittest.TestCase):
                        {'r00': 1, 'r1': 1, 'r4': 1, 'r6': 1, 'r3': 1},
                        {'r00': 1, 'r1': 1, 'r4': 1, 'r5': 1}]
         id2efm = dict(zip(xrange(1, len(r_id2coeffs) + 1),
-                          (EFM(r_ids=self.r_ids, rev_r_ids=self.rev_r_ids, r_id2coeff=it) for it in r_id2coeffs)))
+                          (EFM(r_id2coeff=it) for it in r_id2coeffs)))
         id2clique, _ = detect_cliques(id2efm, 3)
         # Expect to detect the following cliques:
         # {'r1': 1, 'r4': 1, 'r5': 1}
@@ -48,7 +48,7 @@ class CliqueTestCase(unittest.TestCase):
                        {'r00': 1, 'r1': 1, 'r4': 1, 'r6': 1, 'r3': 1},
                        {'r00': 1, 'r1': 1, 'r4': 1, 'r5': 1}]
         id2efm = dict(zip(xrange(1, len(r_id2coeffs) + 1),
-                          (EFM(r_ids=self.r_ids, rev_r_ids=self.rev_r_ids, r_id2coeff=it) for it in r_id2coeffs)))
+                          (EFM(r_id2coeff=it) for it in r_id2coeffs)))
         id2clique, _ = detect_cliques(id2efm, 3)
         # Expect to detect the following cliques:
         # {'r1': 1, 'r4': 1, 'r5': 1}

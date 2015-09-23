@@ -2,9 +2,8 @@ from collections import Counter, defaultdict
 import logging
 
 import libsbml
+
 from networkx import find_cliques, Graph
-from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
-from mod_sbml.utils.misc import invert_map
 
 from mod_cobra.constraint_based_analysis.efm.EFM import EFM
 from mod_sbml.sbml.submodel_manager import remove_unused_species, compress_reaction_participants
@@ -59,8 +58,6 @@ def detect_cliques(id2fm, model, min_clique_size=2):
         if count == len(r_id2fm_ids[r_0]) and count == len(r_id2fm_ids[r_1]) and count > 1:
             gr.add_edge(r_0, r_1)
             r_id_pair2ratio[(r_0, r_1)] = ratio
-    sample_fm = next(id2fm.itervalues())
-    r_ids, rev_r_ids, int_size = sample_fm.r_ids, sample_fm.rev_r_ids, sample_fm.int_size
 
     def clique2r_id2coeff(clique):
         clique = sorted(clique)
@@ -80,7 +77,7 @@ def detect_cliques(id2fm, model, min_clique_size=2):
         r_id2coeff = clique2r_id2coeff(clique)
         r_id2st, p_id2st = compress_reaction_participants(model, r_id2coeff)
         key = tuple(sorted(r_id2st.iteritems())), tuple(sorted(p_id2st.iteritems()))
-        clique = EFM(r_ids=r_ids, rev_r_ids=rev_r_ids, int_size=int_size, r_id2coeff=r_id2coeff)
+        clique = EFM(r_id2coeff=r_id2coeff)
         clique2key[clique] = key
         key2cliques[key].append(clique)
     id2key = dict(zip(xrange(0, len(key2cliques)), sorted(key2cliques.iterkeys(), key=lambda k: -len(key2cliques[k]))))

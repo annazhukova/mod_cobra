@@ -3,7 +3,7 @@ import os
 
 import libsbml
 
-from mod_cobra.constraint_based_analysis import round_value
+from mod_cobra.constraint_based_analysis import round_value, ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.efm.EFM import get_int_size, EFM
 from mod_cobra.gibbs.reaction_boundary_manager import get_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants
@@ -11,8 +11,7 @@ from mod_sbml.sbml.sbml_manager import get_products, get_reactants
 __author__ = 'anna'
 
 
-def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=None, threshold=0.0,
-                 r_ids=None, rewrite=True):
+def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=None, threshold=0.0, rewrite=True):
     """
     Computes elementary flux modes (EFMs) in a given SBML (see http://sbml.org) model,
     that contain a reaction of interest
@@ -21,7 +20,7 @@ def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=
     :param sbml: string, path to the SBML file with the model.
     :param directory: string, directory where to store the results, such as stoichiometric matrix, EFMs.
     :param tree_efm_path: string,path to the executable of TreeEFM software [Pey et al. 2014, PMID: 25380956].
-    :param r_id:string, id of the reaction of interest.
+    :param r_id: string, id of the reaction of interest.
     :param rev: boolean, if the reaction of interest should be considered in the opposite direction.
     :param em_number: int, number of EFMs to compute with TreeEFM software [Pey et al. 2014, PMID: 25380956].
     :param r_id2rev: dictionary {r_id: reversed}, if specified,
@@ -54,21 +53,18 @@ def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=
     # If r_id2rev is specified, filter EFMs to leave only those that include these reactions in these directions.
     em_file_filtered = os.path.join(directory, "FV-EM_filtered.dat.txt")
     efms, all_r_ids, rev_r_ids = filter_efms(efm_file_txt, r_id2i, rev_r_id2i, em_file_filtered, r_id2rev,
-                                             zero_threshold=threshold, r_ids=r_ids)
+                                             zero_threshold=threshold)
     logging.info(
         "%d elementary modes corresponding to reactions of interest saved to %s" % (len(efms), em_file_filtered))
     efms = sorted(efms, key=lambda efm: len(efm))
     return efms, all_r_ids, rev_r_ids
 
 
-def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_threshold=0.0,
-                r_ids=None):
+def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_threshold=ZERO_THRESHOLD):
     i2r_id = {i: (r_id, False) for (r_id, i) in r_id2i.iteritems()}
     i2r_id.update({i: (r_id, True) for (r_id, i) in rev_r_id2i.iteritems()})
-    all_r_ids = r_ids if r_ids else sorted(set(r_id2i.iterkeys()) | set(rev_r_id2i.iterkeys()))
+    all_r_ids = sorted(set(r_id2i.iterkeys()) | set(rev_r_id2i.iterkeys()))
     rev_r_ids = set(rev_r_id2i.iterkeys())
-    int_size = get_int_size()
-    processed = set()
     efms = set()
     rejected_bad, rejected_different = 0, 0
     with open(out_path, 'w+') as out_f:
@@ -107,15 +103,8 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_thres
                         continue
 
                 out_f.write(line)
-
-                if r_ids:
-                    r_id2coefficient = {r_id: val for (r_id, val) in r_id2coefficient.iteritems() if r_id in r_ids}
-                efm = EFM(r_id2coeff=r_id2coefficient, r_ids=all_r_ids, rev_r_ids=rev_r_ids, int_size=int_size)
-
-                if not r_ids or efm.binary_efm not in processed:
-                    efms.add(efm)
-                    if r_ids:
-                        processed.add(efm.binary_efm)
+                efm = EFM(r_id2coeff=r_id2coefficient)
+                efms.add(efm)
     if rejected_different:
         logging.info('Rejected %d EFMs as not all of the reactions of interest were present in them.'
                      % rejected_different)

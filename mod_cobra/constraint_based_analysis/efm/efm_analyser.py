@@ -12,12 +12,11 @@ __author__ = 'anna'
 
 
 def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_number=1000, threshold=ZERO_THRESHOLD,
-             efms=None, r_ids=None, rewrite=True, tree_efm_path=TREEEFM_PATH):
+             efms=None, rewrite=True, tree_efm_path=TREEEFM_PATH):
     if not efms:
         if tree_efm_path:
             efms, r_ids, rev_r_ids = compute_efms(sbml, directory, max_efm_number, target_r_id, target_r_reversed,
-                                                  tree_efm_path, r_id2rev, threshold=threshold, r_ids=r_ids,
-                                                  rewrite=rewrite)
+                                                  tree_efm_path, r_id2rev, threshold=threshold, rewrite=rewrite)
             if not efms:
                 logging.info('Found no EFMs of interest.')
                 return None

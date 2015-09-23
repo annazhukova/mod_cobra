@@ -1,49 +1,14 @@
-from collections import defaultdict
-import logging
-
 import libsbml
-import openpyxl
-from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_yield
 
+from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_yield
 from mod_sbml.utils.misc import invert_map
 from mod_cobra.constraint_based_analysis.efm.EFM import EFM
-from mod_sbml.sbml.sbml_manager import get_r_comps
-from mod_sbml.annotation.kegg.kegg_annotator import get_kegg_r_id
 from mod_sbml.sbml.submodel_manager import submodel
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
-from mod_sbml.serialization.xlsx_helper import BASIC_STYLE, save_data
 
 SIMPLE_PATTERN_SORTER = lambda p_id: -p_id
 
 __author__ = 'anna'
-
-basic_r_style = lambda r_id: BASIC_STYLE
-
-SORT_BY_PATTERN_LENGTH = 1
-SORT_BY_EFM_NUMBER = 0
-SORT_BY_WEIGHTED_PRODUCT_OF_EFM_NUMBER_AND_PATTERN_LENGTH = 2
-
-
-def get_pattern_sorter(id2pattern, p_id2efm_ids, sort=SORT_BY_EFM_NUMBER):
-    if not id2pattern:
-        return SIMPLE_PATTERN_SORTER
-    if SORT_BY_PATTERN_LENGTH == sort:
-        return lambda p_id: -len(id2pattern[p_id])
-    elif SORT_BY_EFM_NUMBER == sort:
-        return lambda p_id: -len(p_id2efm_ids[p_id])
-    elif SORT_BY_WEIGHTED_PRODUCT_OF_EFM_NUMBER_AND_PATTERN_LENGTH == sort:
-        max_pattern_len = max(len(pattern) for pattern in id2pattern.itervalues())
-        min_pattern_len = min(len(pattern) for pattern in id2pattern.itervalues())
-        max_efm_number = max(len(efm_ids) for efm_ids in p_id2efm_ids.itervalues())
-        min_efm_num = min(len(efm_ids) for efm_ids in p_id2efm_ids.itervalues())
-        return lambda p_id: \
-            -(1.0 * (len(id2pattern[p_id]) - min_pattern_len) / (max_pattern_len - min_pattern_len)
-              if max_pattern_len != min_pattern_len else 1) * \
-            ((1.0 * len(p_id2efm_ids[p_id]) - min_efm_num) / (max_efm_number - min_efm_num)
-             if max_efm_number != min_efm_num else 1)
-    else:
-        logging.error('Unknown pattern sorting function %s. Will sort by pattern id.' % sort)
-        return SIMPLE_PATTERN_SORTER
 
 
 def serialize_efms_txt(id2efm, path, efm_id2efficiency, all_efm_intersection):
@@ -123,7 +88,7 @@ def serialize_communities(id2cluster, id2intersection, id2imp_rns, total_len, al
                                      key=lambda r_id: (0 if r_id in all_r_ids else 1, r_id)))
 
 
-def read_efms(output_efm_file, r_ids, rev_r_ids):
+def read_efms(output_efm_file):
     id2efm = {}
     with open(output_efm_file, 'r') as f:
         for line in f:
@@ -136,8 +101,7 @@ def read_efms(output_efm_file, r_ids, rev_r_ids):
                 continue
             efm_id = int(efm[0])
             efm = efm[1:]
-            id2efm[efm_id] = EFM(r_id2coeff={r_id: float(coeff) for (coeff, r_id) in (it.split(' ') for it in efm)},
-                                 r_ids=r_ids, rev_r_ids=rev_r_ids)
+            id2efm[efm_id] = EFM(r_id2coeff={r_id: float(coeff) for (coeff, r_id) in (it.split(' ') for it in efm)})
     return id2efm
 
 
@@ -152,45 +116,6 @@ def r_ids2sbml(r_ids, sbml, out_sbml, suffix='', r_updater=lambda r: True):
         if r:
             r_updater(r)
     libsbml.SBMLWriter().writeSBMLToFile(doc, out_sbml)
-
-
-def serialize_important_reactions(r_id2efm_ids, model, output_file, imp_rn_threshold=0):
-    len2r_ids = defaultdict(list)
-    for r_id, efm_ids in r_id2efm_ids.iteritems():
-        len2r_ids[len(efm_ids)].append(r_id)
-
-    with open(output_file, 'w+') as f:
-        f.write('Found %d reactions that participate in at least %d EFMs\n-----------------------------\n\n'
-                % (len(r_id2efm_ids), imp_rn_threshold))
-        for num, r_ids in sorted(len2r_ids.iteritems(), key=lambda (n, _): -n):
-            for r_id in sorted(r_ids):
-                f.write('in %d EFMs\t%s:%s\n' %
-                        (num, r_id, get_sbml_r_formula(model, model.getReaction(r_id[1:] if '-' == r_id[0] else r_id))))
-            f.write('\n')
-
-
-def serialize_pattern(p_id, pattern, efm_ids, model, output_file):
-    """
-    Serializes a pattern to a file.
-
-    :param p_id: pattern id
-
-    :param pattern: EFM.
-
-    :param output_file: path to the file where the pattern should be saved
-
-    :param efm_ids: a collection of ids of EFMs that contain this pattern
-    """
-    with open(output_file, 'w+') as f:
-        r_id2coeff = pattern.to_r_id2coeff(binary=True)
-        f.write('Pattern %d of length %d found in %d EFMs:\n\t%s\n------------------\n\n'
-                % (p_id, len(r_id2coeff), len(efm_ids), ', '.join(sorted(efm_ids))))
-        coeff2r_id = invert_map(r_id2coeff)
-        for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
-            for r_id in sorted(r_ids):
-                f.write('%g\t%s:\t%s\n' % (coeff, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False,
-                                                                           show_metabolite_ids=True)))
-            f.write('\n')
 
 
 def serialize_clique(cl_id, clique, efm_ids, model, output_file):
@@ -275,43 +200,6 @@ def serialize_fm(fm_id, fm, model, output_file, efficiency, r_id, in_r_id, r_rev
                         (coeff, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False,
                                                          show_metabolite_ids=True)))
             f.write('\n')
-
-
-def serialize_patterns(p_id2efm_ids, id2pattern, output_file, min_pattern_len, all_efm_intersection=None,
-                       min_efm_num=2, sorter=SIMPLE_PATTERN_SORTER):
-    """
-    Serializes patterns to a file, one pattern per line. Patterns are represented as ids of the active reactions
-    (for the reversed reactions, the id is preceded by minus), e.g. -R1 R3 -R7 R11 R25.
-    Patterns are sorted according to the sorter function.
-
-    :param p_id2efm_ids: dict, {pattern id: ids of EFMs containing this pattern}
-
-    :param id2pattern: dict, {pattern id: pattern}.
-
-    :param output_file: path to the file where the patterns should be saved
-
-    :param sorter: a function that given a pattern id return a value that will be used to sort a collection of patterns
-    """
-
-    def log_pattern(p_id, f):
-        pattern = id2pattern[p_id]
-        p_length = len(pattern)
-        efm_len = len(p_id2efm_ids[p_id])
-        p_string = pattern.to_string(binary=True, subpattern=all_efm_intersection)
-        f.write("Pattern %d of length %d:\n\t%s,\nfound in %d EFMs:\n\t%s\n\n"
-                % (p_id, p_length, p_string, efm_len, ', '.join(sorted(p_id2efm_ids[p_id]))))
-
-    with open(output_file, 'w+') as f:
-        f.write(('Found %d patterns of length >= %d, contained in at least %d EFMs.\n'
-                 % (len(id2pattern), min_pattern_len, min_efm_num)) +
-                '--------------------------------------------------------------\n\n')
-        if all_efm_intersection and len(all_efm_intersection):
-            f.write(('Intersection of all EFMs has length %d: %s.\n'
-                     % (len(all_efm_intersection), all_efm_intersection.to_string(binary=True))) +
-                    '--------------------------------------------------------------\n\n')
-
-        for p_id in sorted(p_id2efm_ids.iterkeys(), key=sorter):
-            log_pattern(p_id, f)
 
 
 def serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, output_file):

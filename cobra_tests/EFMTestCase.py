@@ -2,7 +2,6 @@ import os
 import unittest
 import shutil
 
-from mod_cobra.constraint_based_analysis.efm.reaction_classification_by_efm import get_important_reactions
 from cobra_tests.SBMLTestCase import DATA_DIR, TEST_SBML, create_test_sbml
 from mod_cobra.constraint_based_analysis.efm.efm_analyser import get_efms
 from mod_sbml.utils.path_manager import create_dirs
@@ -40,13 +39,6 @@ class EFMTestCase(unittest.TestCase):
         self.assertEqual(2, len(id2efm), 'EFM number was supposed to be 2, got %g instead.' % len(id2efm))
 
     def test_efm_content(self):
-        id2efm = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
+        id2efm, _ = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
         self.assertIn({'r1': 10, 'r2': 10, 'r3': 10}, [efm.to_r_id2coeff() for efm in id2efm.itervalues()],
                       'Failed to detect EFM: 10 r1, 10 r2, 10 r3')
-
-    def test_important_reactions(self):
-        id2efm, _ = get_efms(target_r_id='r3', target_r_reversed=False, sbml=TEST_SBML, directory=EFM_DIR, r_id2rev={})
-        _, important_r_ids = get_important_reactions(id2efm, imp_rn_threshold=0)
-        imp_rs = {'r1', 'r2', 'r3', 'r4', 'r6'}
-        self.assertEqual(imp_rs, important_r_ids, "Important reactions were supposed to be %s, got %s"
-                         % (imp_rs, important_r_ids))

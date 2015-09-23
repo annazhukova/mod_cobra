@@ -51,21 +51,20 @@ def detect_reaction_communities(id2fm, threshold, min_len=2):
             g.add_edge(r_id1, r_id2, weight=count - threshold)
 
     partition = find_partition(graph=g, method='Modularity', weight='weight')
-    clusters = [EFM(r_ids=sample_fm.r_ids, rev_r_ids=sample_fm.rev_r_ids, int_size=sample_fm.int_size,
-                    r_id2coeff=
+    clusters = [EFM(r_id2coeff=
                     {r_id if r_id.find('-') != 0 else r_id[1:]: 1 if r_id.find('-') != 0 else -1 for r_id in
                      (g.vs[v_id]['name'] for v_id in cluster)})
                 for cluster in partition if len(cluster) >= min_len]
     return dict(zip(xrange(0, len(partition)), clusters))
 
 
-def detect_reaction_community(id2efm, threshold_percent, selected_fm):
+def detect_reaction_community(r_ids, rev_r_ids, id2efm, threshold_percent, selected_fm):
     logging.info("Going to detect the largest reaction community, using %d%% as a threshold." % threshold_percent)
 
     g = Graph(directed=False)
-    for r_id in selected_fm.r_ids:
+    for r_id in r_ids:
         g.add_vertex(r_id)
-    for r_id in selected_fm.rev_r_ids:
+    for r_id in rev_r_ids:
         g.add_vertex('-%s' % r_id)
 
     threshold = threshold_percent * len(id2efm) / 100
@@ -84,14 +83,13 @@ def detect_reaction_community(id2efm, threshold_percent, selected_fm):
             g.add_edge(r_id1, r_id2, weight=count - threshold)
 
     partition = find_partition(graph=g, method='Modularity', weight='weight')
-    max_fm = cluster2fm(g, max(partition, key=len), selected_fm)
+    max_fm = cluster2fm(g, max(partition, key=len))
     if not max_fm.intersection_len(selected_fm):
-        max_fm = next((fm for fm in (cluster2fm(g, cluster, selected_fm) for cluster in partition)
+        max_fm = next((fm for fm in (cluster2fm(g, cluster) for cluster in partition)
                        if fm.intersection_len(selected_fm)), max_fm)
     return max_fm
 
 
-def cluster2fm(g, cluster, sample_efm):
-    return EFM(r_ids=sample_efm.r_ids, rev_r_ids=sample_efm.rev_r_ids, int_size=sample_efm.int_size,
-               r_id2coeff={r_id if r_id.find('-') != 0 else r_id[1:]: 1 if r_id.find('-') != 0 else -1 for r_id in
+def cluster2fm(g, cluster):
+    return EFM(r_id2coeff={r_id if r_id.find('-') != 0 else r_id[1:]: 1 if r_id.find('-') != 0 else -1 for r_id in
                            (g.vs[v_id]['name'] for v_id in cluster)})
