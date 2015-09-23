@@ -70,8 +70,8 @@ def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, path, efm_id2effici
                     '==============================================================\n\n')
         for fm_id in sorted(id2fm.iterkeys()):
             fm = id2fm[fm_id]
-            m_id2st = fm_id2key[fm_id]
-            efm_ids = key2efm_ids[m_id2st]
+            r_id2st, p_id2st = fm_id2key[fm_id]
+            efm_ids = key2efm_ids[r_id2st, p_id2st]
             yield_str = '' if not in_r_id else ' of yield %g' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev)
             if len(efm_ids) == 1:
                 efm_id = next(iter(efm_ids))
@@ -82,10 +82,10 @@ def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, path, efm_id2effici
             else:
                 f.write('Pathway %s of length %d of efficiency %g%s.\n\n'
                         % (fm_id, len(fm), fm_id2efficiency[fm_id], yield_str))
-            f.write('Inputs: %s;\n' % ', '.join('%g %s (%s)' % (-st, model.getSpecies(m_id).getName(), m_id)
-                                                for (m_id, st) in m_id2st if st < 0))
+            f.write('Inputs: %s;\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
+                                                for (m_id, st) in r_id2st))
             f.write('Outputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
-                                                 for (m_id, st) in m_id2st if st > 0))
+                                                 for (m_id, st) in p_id2st))
             f.write('Structure: %s\n\n' % fm.to_string(subpattern=all_efm_intersection))
             if len(efm_ids) > 1:
                 f.write('Contains %d EFM%s:\n\n' % (len(efm_ids), 's' if len(efm_ids) != 1 else ''))
@@ -314,27 +314,39 @@ def serialize_patterns(p_id2efm_ids, id2pattern, output_file, min_pattern_len, a
             log_pattern(p_id, f)
 
 
-def serialize_cliques(id2clique, cl_id2efm_ids, output_file):
+def serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, output_file):
     """
     Serializes cliques to a file, one clique per line. Cliques are represented as ids of the active reactions
     (for the reversed reactions, the id is preceded by minus), e.g. -R1 R3 -R7 R11 R25.
 
     :param id2clique: dict, {clique id: clique}.
 
-    :param output_file: path to the file where the cliques should be saved
-    """
+    :param output_file: path to the file where the cliques should be saved """
 
     def log_clique(cl_id, f):
         clique = id2clique[cl_id]
         cl_length = len(clique)
         cl_string = clique.to_string()
         efm_ids = cl_id2efm_ids[cl_id]
-        f.write("Reaction group %d of length %d:\n\n\t%s\n\nfound in %d EFMs:\n\n\t%s\n\n---------------------------------------\n\n"
+        f.write("--------------------------\n\nReaction group %d of length %d:\n\n\t%s\n\nfound in %d EFMs:\n\n\t%s\n\n"
                 % (cl_id, cl_length, cl_string, len(efm_ids), ', '.join(sorted(efm_ids))))
 
     with open(output_file, 'w+') as f:
-        f.write('Found %d coupled reaction groups.\n======================================================================\n\n'
-                % len(id2clique))
+        f.write('Found %d coupled reaction groups of %d types (based on inputs and outputs).\n\n'
+                % (len(id2clique), len(key2cl_ids)))
+        f.write('======================================================================\n\n')
 
-        for cl_id in sorted(id2clique.iterkeys()):
-            log_clique(cl_id, f)
+        for key_id in sorted(id2key.iterkeys()):
+            r_id2st, p_id2st = id2key[key_id]
+            cl_ids = key2cl_ids[(r_id2st, p_id2st)]
+            f.write('Type %d, contains %d reaction group%s.\n\n'
+                    % (key_id, len(cl_ids), 's' if len(cl_ids) != 1 else ''))
+            f.write('Inputs: %s;\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
+                                                for (m_id, st) in r_id2st))
+            f.write('Outputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
+                                                   for (m_id, st) in p_id2st))
+
+            for cl_id in sorted(cl_ids):
+                log_clique(cl_id, f)
+
+            f.write('======================================================================\n\n')

@@ -33,8 +33,9 @@ def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_
 def group_efms(id2efm, model, target_r_id, target_r_rev):
     key2efm_ids = defaultdict(list)
     for efm_id, efm in id2efm.iteritems():
-        m_id2stoichiometry = tuple(sorted(compress_reaction_participants(model, efm.to_r_id2coeff()).iteritems()))
-        key2efm_ids[m_id2stoichiometry].append(efm_id)
+        r_id2st, p_id2st = compress_reaction_participants(model, efm.to_r_id2coeff())
+        r_id2st, p_id2st =tuple(sorted(r_id2st.iteritems())), tuple(sorted(p_id2st.iteritems()))
+        key2efm_ids[r_id2st, p_id2st].append(efm_id)
     fm2key = {id2efm[efm_ids[0]].join([id2efm[efm_id] for efm_id in efm_ids[1:]]): key
               for (key, efm_ids) in key2efm_ids.iteritems()}
 

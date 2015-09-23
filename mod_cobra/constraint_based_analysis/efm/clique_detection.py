@@ -3,14 +3,17 @@ import logging
 
 import libsbml
 from networkx import find_cliques, Graph
+from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
+from mod_sbml.utils.misc import invert_map
 
 from mod_cobra.constraint_based_analysis.efm.EFM import EFM
-from mod_sbml.sbml.submodel_manager import remove_unused_species, create_lumped_reaction
+from mod_sbml.sbml.submodel_manager import remove_unused_species, compress_reaction_participants
+from mod_sbml.sbml.sbml_manager import create_reaction
 
 __author__ = 'anna'
 
 
-def detect_cliques(id2fm, min_clique_size=2):
+def detect_cliques(id2fm, model, min_clique_size=2):
     """
     The method takes the found FMs and constructs the reaction graph in the following way:
     nodes are marked with reaction ids (or -r_id for the reversed versions of reversible reactions),
@@ -71,29 +74,53 @@ def detect_cliques(id2fm, min_clique_size=2):
             r_id2coeff[r_1] = ratio * c_1
         return r_id2coeff
 
-    cliques = [EFM(r_ids=r_ids, rev_r_ids=rev_r_ids, int_size=int_size,
-                   r_id2coeff=clique2r_id2coeff(clique)) for clique in
-               (clique for clique in find_cliques(gr) if len(clique) >= min_clique_size)]
-    id2clique = dict(zip(xrange(0, len(cliques)), sorted(cliques, key=lambda cl: -len(cl))))
+    clique2key = {}
+    key2cliques = defaultdict(list)
+    for clique in (clique for clique in find_cliques(gr) if len(clique) >= min_clique_size):
+        r_id2coeff = clique2r_id2coeff(clique)
+        r_id2st, p_id2st = compress_reaction_participants(model, r_id2coeff)
+        key = tuple(sorted(r_id2st.iteritems())), tuple(sorted(p_id2st.iteritems()))
+        clique = EFM(r_ids=r_ids, rev_r_ids=rev_r_ids, int_size=int_size, r_id2coeff=r_id2coeff)
+        clique2key[clique] = key
+        key2cliques[key].append(clique)
+    id2key = dict(zip(xrange(0, len(key2cliques)), sorted(key2cliques.iterkeys(), key=lambda k: -len(key2cliques[k]))))
+    key2id = {k: k_id for (k_id, k) in id2key.iteritems()}
+    id2clique = dict(zip(xrange(0, len(clique2key)), sorted(clique2key.iterkeys(),
+                                                            key=lambda cl: (key2id[clique2key[cl]], -len(cl)))))
+    clique2id = {cl: cl_id for (cl_id, cl) in id2clique.iteritems()}
     return id2clique, {clique_id: r_id2fm_ids[rc2symbol(*clique.get_sample_r_id_coefficient_pair())]
-                       for (clique_id, clique) in id2clique.iteritems()}
+                       for (clique_id, clique) in id2clique.iteritems()}, \
+           id2key, {key: [clique2id[cl] for cl in cliques] for (key, cliques) in key2cliques.iteritems()}
 
 
-def clique2lumped_reaction(id2clique, in_sbml, out_sbml):
+def clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, out_sbml):
     doc = libsbml.SBMLReader().readSBML(in_sbml)
     model = doc.getModel()
-    r_id2cl_id = {}
+    cl_id2r_ids = {}
+
     for cl_id, clique in id2clique.iteritems():
         r_id2coeff = clique.to_r_id2coeff()
-        new_r_id = create_lumped_reaction(r_id2coeff, model, id_prefix='rl_%d' % cl_id, replace=False)
-        r_id2cl_id.update({(r_id, 1 if coeff > 0 else -1): new_r_id for (r_id, coeff) in r_id2coeff.iteritems()})
-    for r_id, _ in r_id2cl_id.iterkeys():
+        cl_id2r_ids[cl_id] = [(r_id, 1 if coeff > 0 else -1) for (r_id, coeff) in r_id2coeff.iteritems()]
+
+    r_id2new_r_id = {}
+    for k_id, key in id2key.iteritems():
+        cl_ids = key2cl_ids[key]
+        name = ('lumped reaction groups of type %d' % k_id) if len(cl_ids) > 1 else \
+            'lumped reaction group %d' % next(iter(cl_ids))
+        id_ = ('rg_t_%d' % k_id) if len(cl_ids) > 1 else 'rg_%d' % next(iter(cl_ids))
+        new_r_id = create_reaction(model, dict(key[0]), dict(key[1]), reversible=False,
+                                   id_=id_, name=name).getId()
+        for cl_id in cl_ids:
+            r_id2new_r_id.update({r_id_coeff: new_r_id for r_id_coeff in cl_id2r_ids[cl_id]})
+
+    for r_id, _ in r_id2new_r_id.iterkeys():
         model.removeReaction(r_id)
+
     remove_unused_species(model)
     model.setId('%s_merged_cliques' % model.getId())
     model.setName('%s_merged_cliques' % model.getName())
     libsbml.SBMLWriter().writeSBMLToFile(doc, out_sbml)
-    return r_id2cl_id
+    return r_id2new_r_id
 
 
 
