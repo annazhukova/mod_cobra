@@ -5,8 +5,9 @@ import shutil
 
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
+from misc import invert_map
 
-from mod_cobra.constraint_based_analysis.efm.clique_detection import detect_cliques, clique2lumped_reaction
+from mod_cobra.constraint_based_analysis.efm.clique_detection import detect_cliques, clique2lumped_reaction, fold_efms
 from mod_cobra.constraint_based_analysis.efm.community_detection import detect_fm_communities, detect_reaction_community
 from mod_cobra.constraint_based_analysis.html_descriptor import describe
 from mod_sbml.serialization.csv_manager import serialize_common_part_to_csv, serialize_model_info
@@ -135,6 +136,8 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
 
             fva_sbml = os.path.join(fva_dir, 'Model_FVA.xml')
             sbml = create_fva_model(sbml, r_id2bounds, fva_sbml)
+            doc = libsbml.SBMLReader().readSBML(sbml)
+            model = doc.getModel()
         description += describe('fva.html', optimal_value=opt_val, ess_r_num=ess_rn_num, var_r_num=var_rn_num,
                                 description_filepath=get_f_path(fva_file) if opt_val else None,
                                 sbml_filepath=get_f_path(fva_sbml) if opt_val else None)
@@ -173,7 +176,17 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
 
         efm_num = len(id2efm)
         if efm_num:
-            id2fm, fm_id2efficiency, fm_id2key, key2efm_ids = group_efms(id2efm, model, out_r_id, out_rev)
+            sbml, clique_description, id2clique, cl_id2new_r_id = \
+                process_cliques(res_dir, get_f_path, id2efm, r_id2mask, sbml, model, vis_r_ids)
+            new_r_id2cl_id = invert_map(cl_id2new_r_id)
+            description += clique_description
+
+            doc = libsbml.SBMLReader().readSBML(sbml)
+            model = doc.getModel()
+
+            id2folded_efm, folded_efm_id2efm_ids = fold_efms(id2efm, id2clique, cl_id2new_r_id)
+
+            id2fm, fm_id2key, key2folded_efm_ids = group_efms(id2folded_efm, model)
             fm_num = len(id2fm)
 
             all_fm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2fm.itervalues(),
@@ -190,17 +203,18 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
 
             all_fm_file = os.path.join(efm_dir, 'pathways.txt')
             in_r_id, in_r_rev = next(in_r_id2rev.iteritems()) if in_r_id2rev else (None, False)
-            serialize_fms_txt(id2fm, id2efm, fm_id2key, key2efm_ids, all_fm_file, efm_id2efficiency, fm_id2efficiency,
-                              all_efm_intersection, model, out_r_id, out_rev, in_r_id, in_r_rev)
+            serialize_fms_txt(id2fm, id2efm, fm_id2key, key2folded_efm_ids, all_fm_file, efm_id2efficiency, id2folded_efm,
+                              folded_efm_id2efm_ids, new_r_id2cl_id, id2clique, all_efm_intersection,
+                              model, out_r_id, out_rev, in_r_id, in_r_rev)
 
-            # 3 most effective FMs
+            # 3 FMs
             limit = min(3, fm_num)
             mask_shift, fms \
                 = process_n_fms(directory=efm_dir, id2fm=id2fm, id2mask=r_id2mask,
                                 layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
-                                name='pathway', sorter=lambda (fm_id, _): -fm_id2efficiency[fm_id],
+                                name='pathway', sorter=lambda (fm_id, _): fm_id,
                                 serializer=lambda fm_id, efm_txt:
-                                serialize_fm(fm_id, id2fm[fm_id], model, efm_txt, fm_id2efficiency[fm_id],
+                                serialize_fm(fm_id, id2fm[fm_id], model, efm_txt,
                                              out_r_id, in_r_id, out_rev, in_r_rev),
                                 suffix=lambda _: '', get_f_path=get_f_path, limit=limit, update_vis=True)
             fm_block = describe('fm_block.html', element_num=limit, characteristics='most effective',
@@ -240,10 +254,6 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
                                     description_filepath=get_f_path(comm_txt) if id2cluster else None,
                                     selected_community_block=fm_block)
 
-            sbml, clique_description, r_id2new_r_id, id2clique, cl_id2efm_ids, id2key, key2cl_ids = \
-                process_cliques(res_dir, get_f_path, id2efm, r_id2mask, sbml, model, vis_r_ids)
-            description += clique_description
-
     if not vis_r_ids:
         description += describe('nothing_found.html')
 
@@ -255,6 +265,7 @@ def process_cliques(res_dir, get_f_path, id2efm, id2mask, in_sbml, model, vis_r_
     clique_dir = os.path.join(res_dir, 'coupled_reactions')
     create_dirs(clique_dir)
     id2clique, cl_id2efm_ids, id2key, key2cl_ids = detect_cliques(id2efm, model)
+    cl_id2new_r_id = {}
     if id2clique:
         cliques_txt = os.path.join(clique_dir, 'coupled_reactions.txt')
         serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, cliques_txt)
@@ -270,7 +281,7 @@ def process_cliques(res_dir, get_f_path, id2efm, id2mask, in_sbml, model, vis_r_
                             element_name='coupled reaction group', fms=fms, all=limit == len(id2clique))
 
         clique_merged_sbml = os.path.join(clique_dir, 'Model_lumped.xml')
-        r_id2new_r_id = clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, clique_merged_sbml)
+        r_id2new_r_id, cl_id2new_r_id = clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, clique_merged_sbml)
         vis_r_ids |= {cl_id for ((r_id, _), cl_id) in r_id2new_r_id.iteritems() if r_id in vis_r_ids}
         for (r_id, coeff), new_r_id in r_id2new_r_id.iteritems():
             if (r_id, coeff) in id2mask:
@@ -282,7 +293,7 @@ def process_cliques(res_dir, get_f_path, id2efm, id2mask, in_sbml, model, vis_r_
                            description_filepath=get_f_path(cliques_txt) if id2clique else None,
                            selected_clique_block=fm_block if id2clique else None,
                            type_num=len(id2key))
-    return clique_merged_sbml, description, r_id2new_r_id, id2clique, cl_id2efm_ids, id2key, key2cl_ids
+    return clique_merged_sbml, description, id2clique, cl_id2new_r_id
 
 
 def mean(values):

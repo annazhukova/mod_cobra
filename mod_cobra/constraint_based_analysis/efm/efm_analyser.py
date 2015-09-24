@@ -29,7 +29,7 @@ def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_
     return id2efm, {efm_id: efm2efficiency[efm] for (efm_id, efm) in id2efm.iteritems()}
 
 
-def group_efms(id2efm, model, target_r_id, target_r_rev):
+def group_efms(id2efm, model):
     key2efm_ids = defaultdict(list)
     for efm_id, efm in id2efm.iteritems():
         r_id2st, p_id2st = compress_reaction_participants(model, efm.to_r_id2coeff())
@@ -37,13 +37,10 @@ def group_efms(id2efm, model, target_r_id, target_r_rev):
         key2efm_ids[r_id2st, p_id2st].append(efm_id)
     fm2key = {id2efm[efm_ids[0]].join([id2efm[efm_id] for efm_id in efm_ids[1:]]): key
               for (key, efm_ids) in key2efm_ids.iteritems()}
-
-    fm2efficiency = {fm: get_fm_efficiency(fm, target_r_id, target_r_rev) for fm in fm2key.iterkeys()}
     id2fm = dict(zip((str(it) for it in xrange(0, len(fm2key))),
-                     sorted(fm2key.iterkeys(), key=lambda fm: (-fm2efficiency[fm], min(key2efm_ids[fm2key[fm]])))))
+                     sorted(fm2key.iterkeys(), key=lambda fm: min(key2efm_ids[fm2key[fm]]))))
 
-    return id2fm, {fm_id: fm2efficiency[fm] for (fm_id, fm) in id2fm.iteritems()}, \
-           {fm_id: fm2key[fm] for (fm_id, fm) in id2fm.iteritems()}, key2efm_ids
+    return id2fm, {fm_id: fm2key[fm] for (fm_id, fm) in id2fm.iteritems()}, key2efm_ids
 
 
 def calculate_imp_rn_threshold(total_len, imp_rn_threshold=None):

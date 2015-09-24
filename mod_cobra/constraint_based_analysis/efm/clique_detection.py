@@ -4,6 +4,7 @@ import logging
 import libsbml
 
 from networkx import find_cliques, Graph
+from mod_sbml.utils.misc import invert_map
 
 from mod_cobra.constraint_based_analysis.efm.EFM import EFM
 from mod_sbml.sbml.submodel_manager import remove_unused_species, compress_reaction_participants
@@ -100,6 +101,8 @@ def clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, out_sbml):
         cl_id2r_ids[cl_id] = [(r_id, 1 if coeff > 0 else -1) for (r_id, coeff) in r_id2coeff.iteritems()]
 
     r_id2new_r_id = {}
+    cl_id2new_r_id = {}
+    r_id2direction = defaultdict(lambda: [False, False])
     for k_id, key in id2key.iteritems():
         cl_ids = key2cl_ids[key]
         name = ('lumped reaction groups of type %d' % k_id) if len(cl_ids) > 1 else \
@@ -108,16 +111,33 @@ def clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, out_sbml):
         new_r_id = create_reaction(model, dict(key[0]), dict(key[1]), reversible=False,
                                    id_=id_, name=name).getId()
         for cl_id in cl_ids:
-            r_id2new_r_id.update({r_id_coeff: new_r_id for r_id_coeff in cl_id2r_ids[cl_id]})
+            cl_id2new_r_id[cl_id] = new_r_id
+            for r_id, coeff in cl_id2r_ids[cl_id]:
+                r_id2new_r_id[r_id, coeff] = new_r_id
+                r_id2direction[r_id][0 if coeff > 0 else 1] = True
 
-    for r_id, _ in r_id2new_r_id.iterkeys():
-        model.removeReaction(r_id)
+    for r_id, [d1, d2] in r_id2direction.iteritems():
+        if d1 and (d2 or not model.getReaction(r_id).getReversible()):
+            model.removeReaction(r_id)
 
     remove_unused_species(model)
     model.setId('%s_merged_cliques' % model.getId())
     model.setName('%s_merged_cliques' % model.getName())
     libsbml.SBMLWriter().writeSBMLToFile(doc, out_sbml)
-    return r_id2new_r_id
+    return r_id2new_r_id, cl_id2new_r_id
+
+
+def fold_efms(id2efm, id2clique, cl_id2new_r_id):
+    efm_id2folded_efm = {efm_id: efm.fold_cliques(id2clique, cl_id2new_r_id) for (efm_id, efm) in id2efm.iteritems()}
+    folded_efm2ids = invert_map(efm_id2folded_efm)
+    if len(folded_efm2ids) < len(efm_id2folded_efm):
+        id2folded_efm = dict(zip((str(it) for it in xrange(0, len(folded_efm2ids))),
+                                 sorted(folded_efm2ids.iterkeys(), key=lambda f_efm: min(folded_efm2ids[f_efm]))))
+        folded_efm_id2efm_ids = {f_efm_id: folded_efm2ids[f_efm] for (f_efm_id, f_efm) in id2folded_efm.iteritems()}
+    else:
+        id2folded_efm = efm_id2folded_efm
+        folded_efm_id2efm_ids = {efm_id: {efm_id} for efm_id in efm_id2folded_efm.iterkeys()}
+    return id2folded_efm, folded_efm_id2efm_ids
 
 
 

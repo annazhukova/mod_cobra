@@ -90,6 +90,22 @@ class EFM(object):
             dict(set(self.to_r_id2coeff(binary=True).iteritems()) & set(other.to_r_id2coeff(binary=True).iteritems()))
         return EFM(r_id2coeff=r_id2coeff)
 
+    def fold_cliques(self, id2clique, cl_id2new_r_id):
+        new_r_id2coeff = Counter()
+        replaced_r_ids = set()
+        for cl_id, clique in id2clique.iteritems():
+            r_id, coeff = clique.get_sample_r_id_coefficient_pair()
+            if r_id in self.r_id2coeff:
+                ratio = 1.0 * self.r_id2coeff[r_id] / coeff
+                if ratio > 0:
+                    replaced_r_ids |= set(clique.r_id2coeff.iterkeys())
+                    new_r_id2coeff.update({cl_id2new_r_id[cl_id]: ratio})
+        if not replaced_r_ids:
+            return self
+        new_r_id2coeff.update({r_id: coeff for (r_id, coeff) in self.r_id2coeff.iteritems()
+                               if r_id not in replaced_r_ids})
+        return EFM(r_id2coeff=new_r_id2coeff)
+
     def intersection_len(self, other):
         return len(set(self.to_r_id2coeff(binary=True).iteritems()) & set(other.to_r_id2coeff(binary=True).iteritems()))
 
