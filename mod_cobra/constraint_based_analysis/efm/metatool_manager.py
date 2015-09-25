@@ -5,7 +5,7 @@ import re
 
 import libsbml
 
-from mod_cobra.constraint_based_analysis.efm.EFM import EFM
+from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_EFM
 from mod_cobra.gibbs.reaction_boundary_manager import set_bounds
 
 __author__ = 'anna'
@@ -246,7 +246,7 @@ def convert_metatool_output2efm(metatool_file, in_dat=None, r_rev_ids=None, r_ir
                 coefficients = re.findall(r"[-+]?\d*\.*\d+", line)
                 r_id2coefficient = {r_id: float(c) for (r_id, c) in zip(sorted_r_ids, coefficients) if float(c) != 0}
                 if not r_id or r_id in r_id2coefficient:
-                    efms.append(EFM(r_id2coeff=r_id2coefficient))
+                    efms.append(EFM(r_id2coeff=r_id2coefficient, type=TYPE_EFM))
             line = next(f)
     return efms
 

@@ -6,7 +6,7 @@ import libsbml
 from networkx import find_cliques, Graph
 from mod_sbml.utils.misc import invert_map
 
-from mod_cobra.constraint_based_analysis.efm.EFM import EFM
+from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_PATTERN
 from mod_sbml.sbml.submodel_manager import remove_unused_species, compress_reaction_participants
 from mod_sbml.sbml.sbml_manager import create_reaction
 
@@ -78,7 +78,7 @@ def detect_cliques(id2fm, model, min_clique_size=2):
         r_id2coeff = clique2r_id2coeff(clique)
         r_id2st, p_id2st = compress_reaction_participants(model, r_id2coeff)
         key = tuple(sorted(r_id2st.iteritems())), tuple(sorted(p_id2st.iteritems()))
-        clique = EFM(r_id2coeff=r_id2coeff)
+        clique = EFM(r_id2coeff=r_id2coeff, type=TYPE_PATTERN)
         clique2key[clique] = key
         key2cliques[key].append(clique)
     id2key = dict(zip(xrange(0, len(key2cliques)), sorted(key2cliques.iterkeys(), key=lambda k: -len(key2cliques[k]))))
@@ -130,13 +130,15 @@ def clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, out_sbml):
 def fold_efms(id2efm, id2clique, cl_id2new_r_id):
     efm_id2folded_efm = {efm_id: efm.fold_cliques(id2clique, cl_id2new_r_id) for (efm_id, efm) in id2efm.iteritems()}
     folded_efm2ids = invert_map(efm_id2folded_efm)
-    if len(folded_efm2ids) < len(efm_id2folded_efm):
-        id2folded_efm = dict(zip((str(it) for it in xrange(0, len(folded_efm2ids))),
-                                 sorted(folded_efm2ids.iterkeys(), key=lambda f_efm: min(folded_efm2ids[f_efm]))))
-        folded_efm_id2efm_ids = {f_efm_id: folded_efm2ids[f_efm] for (f_efm_id, f_efm) in id2folded_efm.iteritems()}
-    else:
-        id2folded_efm = efm_id2folded_efm
-        folded_efm_id2efm_ids = {efm_id: {efm_id} for efm_id in efm_id2folded_efm.iterkeys()}
+    id2folded_efm = {}
+    folded_efm_id2efm_ids = {}
+    i = 0
+    for efm_id, folded_efm in efm_id2folded_efm.iteritems():
+        if efm_id != folded_efm.id:
+            folded_efm.id = 'Folded EFM %d' % i
+            i += 1
+        id2folded_efm[folded_efm.id] = folded_efm
+        folded_efm_id2efm_ids[folded_efm.id] = folded_efm2ids[folded_efm]
     return id2folded_efm, folded_efm_id2efm_ids
 
 

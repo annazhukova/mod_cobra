@@ -176,13 +176,17 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
 
         efm_num = len(id2efm)
         if efm_num:
-            sbml, clique_description, id2clique, cl_id2new_r_id = \
+            all_efm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2efm.itervalues(),
+                                          next(id2efm.itervalues()))
+
+            sbml, clique_description, id2clique, r_id2new_r_id, cl_id2new_r_id = \
                 process_cliques(res_dir, get_f_path, id2efm, r_id2mask, sbml, model, vis_r_ids)
-            new_r_id2cl_id = invert_map(cl_id2new_r_id)
             description += clique_description
 
             doc = libsbml.SBMLReader().readSBML(sbml)
             model = doc.getModel()
+
+            all_efm_intersection_folded = all_efm_intersection.fold_cliques(id2clique, cl_id2new_r_id)
 
             id2folded_efm, folded_efm_id2efm_ids = fold_efms(id2efm, id2clique, cl_id2new_r_id)
 
@@ -192,19 +196,22 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             all_fm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2fm.itervalues(),
                                          next(id2fm.itervalues()))
 
-            all_efm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2efm.itervalues(),
-                                          next(id2efm.itervalues()))
-            if len(all_efm_intersection):
-                update_vis_layers(all_efm_intersection.to_r_id2coeff(binary=True),
-                                  'EFM intersection', r_id2mask, layer2mask, mask_shift, vis_r_ids)
+            if len(all_efm_intersection_folded):
+                update_vis_layers(all_efm_intersection_folded.to_r_id2coeff(binary=True),
+                                  'Folded EFM intersection', r_id2mask, layer2mask, mask_shift, vis_r_ids)
                 if not main_layer:
-                    main_layer = 'EFM intersection'
+                    main_layer = 'Folded EFM intersection'
                 mask_shift += 1
 
             all_fm_file = os.path.join(efm_dir, 'pathways.txt')
             in_r_id, in_r_rev = next(in_r_id2rev.iteritems()) if in_r_id2rev else (None, False)
-            serialize_fms_txt(id2fm, id2efm, fm_id2key, key2folded_efm_ids, all_fm_file, efm_id2efficiency, id2folded_efm,
-                              folded_efm_id2efm_ids, new_r_id2cl_id, id2clique, all_efm_intersection,
+            r_id2cl_id = {}
+            for cl_id, clique in id2clique.iteritems():
+                r_id2cl_id.update({(r_id, 1 if coeff > 0 else -1): cl_id
+                                   for (r_id, coeff) in clique.to_r_id2coeff().iteritems()})
+            serialize_fms_txt(id2fm, id2efm, fm_id2key, key2folded_efm_ids, all_fm_file, efm_id2efficiency,
+                              id2folded_efm, folded_efm_id2efm_ids, r_id2new_r_id, r_id2cl_id,
+                              all_efm_intersection, all_efm_intersection_folded,
                               model, out_r_id, out_rev, in_r_id, in_r_rev)
 
             # 3 FMs
@@ -265,7 +272,7 @@ def process_cliques(res_dir, get_f_path, id2efm, id2mask, in_sbml, model, vis_r_
     clique_dir = os.path.join(res_dir, 'coupled_reactions')
     create_dirs(clique_dir)
     id2clique, cl_id2efm_ids, id2key, key2cl_ids = detect_cliques(id2efm, model)
-    cl_id2new_r_id = {}
+    cl_id2new_r_id, r_id2new_r_id = {}, {}
     if id2clique:
         cliques_txt = os.path.join(clique_dir, 'coupled_reactions.txt')
         serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, cliques_txt)
@@ -293,7 +300,9 @@ def process_cliques(res_dir, get_f_path, id2efm, id2mask, in_sbml, model, vis_r_
                            description_filepath=get_f_path(cliques_txt) if id2clique else None,
                            selected_clique_block=fm_block if id2clique else None,
                            type_num=len(id2key))
-    return clique_merged_sbml, description, id2clique, cl_id2new_r_id
+    return clique_merged_sbml, description, id2clique, \
+           {(r_id, 1 if coeff > 0 else -1): new_r_id for ((r_id, coeff), new_r_id) in r_id2new_r_id.iteritems()}, \
+           cl_id2new_r_id
 
 
 def mean(values):
@@ -445,13 +454,13 @@ def process_n_fms(directory, id2fm, id2mask, layer2mask, mask_shift, vis_r_ids,
     for fm_id, fm in sorted(id2fm.iteritems(), key=sorter):
         r_id2coeff = fm.to_r_id2coeff()
         c_name = name[0].upper() + name[1:]
-        fm_name = '%s_%s_of_len_%d' % (c_name.replace(' ', '_'), str(fm_id), len(fm))
-        fm_txt = os.path.join(sbml_dir, '%s.txt' % fm_name)
+        fm_name = fm.id if fm.id else '%s %s' % (c_name, str(fm_id))
+        fm_txt = os.path.join(sbml_dir, '%s.txt' % fm_name.replace(' ', '_'))
         serializer(fm_id, fm_txt)
         fms.append((c_name, fm_id, len(fm), suffix(fm_id), get_f_path(fm_txt)))
 
         if update_vis:
-            update_vis_layers(r_id2coeff, '%s %s' % (c_name, str(fm_id)), id2mask, layer2mask, mask_shift, vis_r_ids)
+            update_vis_layers(r_id2coeff, fm_name, id2mask, layer2mask, mask_shift, vis_r_ids)
             mask_shift += 1
 
         limit -= 1

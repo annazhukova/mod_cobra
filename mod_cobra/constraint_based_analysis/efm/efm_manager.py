@@ -4,7 +4,7 @@ import os
 import libsbml
 
 from mod_cobra.constraint_based_analysis import round_value, ZERO_THRESHOLD
-from mod_cobra.constraint_based_analysis.efm.EFM import get_int_size, EFM
+from mod_cobra.constraint_based_analysis.efm.EFM import get_int_size, EFM, TYPE_EFM
 from mod_cobra.gibbs.reaction_boundary_manager import get_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants
 
@@ -103,7 +103,7 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_thres
                         continue
 
                 out_f.write(line)
-                efm = EFM(r_id2coeff=r_id2coefficient)
+                efm = EFM(r_id2coeff=r_id2coefficient, type=TYPE_EFM)
                 efms.add(efm)
     if rejected_different:
         logging.info('Rejected %d EFMs as not all of the reactions of interest were present in them.'

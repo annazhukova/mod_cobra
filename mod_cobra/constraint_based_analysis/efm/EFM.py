@@ -6,6 +6,11 @@ from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 __author__ = 'anna'
 
 
+TYPE_EFM = 0
+TYPE_PATHWAY = 1
+TYPE_FOLDED_EFM = 2
+TYPE_PATTERN = 3
+
 def get_int_size():
     """
     Calculates the maximal number of bits in an int:
@@ -20,14 +25,24 @@ def coeff_to_binary(coeff):
     return 1 if coeff > 0 else -1
 
 
+def normalize(r_id2coeff):
+    c = min(abs(it) for it in r_id2coeff.itervalues())
+    ratio = 1.0 / c
+    if ratio == 1:
+        return r_id2coeff
+    return {r_id: coeff * ratio for (r_id, coeff) in r_id2coeff.iteritems()}
+
+
 class EFM(object):
-    def __init__(self, r_id2coeff=None):
+    def __init__(self, r_id2coeff, type=TYPE_EFM, id=None):
         """
         Creates an EFM representation from {r_id: coefficient} map.
 
         :param r_id2coeff: a EFM represented as a dictionary {r_id: coefficient}.
         """
         self.r_id2coeff = r_id2coeff
+        self.type = type
+        self.id = id
         self.hash = hash(tuple(sorted(self.r_id2coeff.iteritems())))
 
     def translate(self, id2id):
@@ -39,27 +54,41 @@ class EFM(object):
         r_id2coeff = Counter(self.to_r_id2coeff())
         for efm in efms:
             r_id2coeff.update(efm.to_r_id2coeff())
-        return EFM(r_id2coeff={r_id: coeff for (r_id, coeff) in r_id2coeff.iteritems() if abs(coeff) > zero_threshold})
+        r_id2coeff = {r_id: coeff for (r_id, coeff) in r_id2coeff.iteritems() if abs(coeff) > zero_threshold}
+        if normalize(r_id2coeff) == normalize(self.r_id2coeff):
+            return self
+        return EFM(r_id2coeff=r_id2coeff, type=TYPE_PATHWAY)
 
     def __str__(self, binary=False):
         return self.to_string()
 
-    def to_string(self, binary=False, subpattern=None, key=None, show_subpattern=True):
-        r_id2coefficient = self.to_r_id2coeff()
-        subkeys = set()
-        if subpattern:
-            subkeys = set(r_id2coefficient.iterkeys()) & set(subpattern.to_r_id2coeff().iterkeys())
-        keys = sorted(set(r_id2coefficient.iterkeys()) - subkeys, key=key)
-        if binary:
-            result = ''
-            if subkeys and show_subpattern:
-                result += '(%s)\t' % '\t'.join('%s%s' % ('-' if r_id2coefficient[r_id] < 0 else '', r_id)
-                                             for r_id in sorted(subkeys, key=key))
-            return result + '\t'.join('%s%s' % ('-' if r_id2coefficient[r_id] < 0 else '', r_id) for r_id in keys)
-        result = ''
-        if subkeys and show_subpattern:
-            result += '(%s)\t' % '\t'.join('%g %s' % (r_id2coefficient[r_id], r_id) for r_id in sorted(subkeys, key=key))
-        return result + '\t'.join('%g %s' % (r_id2coefficient[r_id], r_id) for r_id in keys)
+    def to_string(self, binary=False, get_key=lambda r_id, c: r_id, get_group=lambda r_id, c: None, hidden_r_ids=None):
+        result = []
+        clique_started = None
+        started = False
+        for r_id in sorted(self.r_id2coeff.iterkeys(),
+                           key=lambda r_id: get_key(r_id, coeff_to_binary(self.r_id2coeff[r_id]))):
+            cl_id = get_group(r_id, coeff_to_binary(self.r_id2coeff[r_id]))
+            if cl_id != clique_started:
+                if clique_started:
+                    result.append(')')
+                    clique_started = None
+                if cl_id and (not hidden_r_ids or r_id not in hidden_r_ids):
+                    clique_started = cl_id
+                    result.append('%s(' % ('\t' if started else ''))
+                    started = False
+
+            if not hidden_r_ids or r_id not in hidden_r_ids:
+                if binary:
+                    result.append('%s%s%s' % ('\t' if started else '', '-' if self.r_id2coeff[r_id] < 0 else '', r_id))
+                else:
+                    result.append('%s%g %s' % ('\t' if started else '', self.r_id2coeff[r_id], r_id))
+                started = True
+
+        if clique_started:
+            result.append(')')
+
+        return ''.join(result)
 
     def to_r_id2coeff(self, binary=False):
         """
@@ -88,7 +117,15 @@ class EFM(object):
             raise AttributeError('Other should be of type EFM')
         r_id2coeff = \
             dict(set(self.to_r_id2coeff(binary=True).iteritems()) & set(other.to_r_id2coeff(binary=True).iteritems()))
-        return EFM(r_id2coeff=r_id2coeff)
+        if r_id2coeff == self.r_id2coeff:
+            return self
+        return EFM(r_id2coeff=r_id2coeff, type=TYPE_PATTERN)
+
+    def __getitem__(self, r_id):
+        return self.r_id2coeff[r_id] if r_id in self.r_id2coeff else 0
+
+    def __contains__(self, r_id):
+        return r_id in self.r_id2coeff
 
     def fold_cliques(self, id2clique, cl_id2new_r_id):
         new_r_id2coeff = Counter()
@@ -104,7 +141,7 @@ class EFM(object):
             return self
         new_r_id2coeff.update({r_id: coeff for (r_id, coeff) in self.r_id2coeff.iteritems()
                                if r_id not in replaced_r_ids})
-        return EFM(r_id2coeff=new_r_id2coeff)
+        return EFM(r_id2coeff=new_r_id2coeff, type=TYPE_FOLDED_EFM)
 
     def intersection_len(self, other):
         return len(set(self.to_r_id2coeff(binary=True).iteritems()) & set(other.to_r_id2coeff(binary=True).iteritems()))

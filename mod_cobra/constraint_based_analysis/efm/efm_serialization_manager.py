@@ -2,12 +2,13 @@ import libsbml
 
 from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_yield
 from mod_sbml.utils.misc import invert_map
-from mod_cobra.constraint_based_analysis.efm.EFM import EFM
+from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_EFM, TYPE_FOLDED_EFM, TYPE_PATHWAY
 from mod_sbml.sbml.submodel_manager import submodel
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 
 THICK_DELIMITER = '==============================================================\n\n'
 THIN_DELIMITER = '------------------------------------------\n\n'
+TINY_DELIMITER = '-------------\n\n'
 
 SIMPLE_PATTERN_SORTER = lambda p_id: -p_id
 
@@ -15,84 +16,125 @@ __author__ = 'anna'
 
 
 def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2folded_efm_ids, path, efm_id2efficiency,
-                      id2folded_efm, folded_efm_id2efm_ids, new_r_id2cl_id, id2clique,
-                      all_efm_intersection, model, r_id, r_rev, in_r_id, in_r_rev):
+                      id2folded_efm, folded_efm_id2efm_ids, r_id2new_r_id, r_id2cl_id,
+                      all_fm_intersection, all_fm_intersection_folded,
+                      model, r_id, r_rev, in_r_id, in_r_rev):
     with open(path, 'w+') as f:
         f.write('Found %d EFMs, folded into %d EFMs, grouped into %d pathways:\n\n'
                 % (len(id2efm), len(id2folded_efm), len(id2fm)))
         f.write(THICK_DELIMITER)
-        if all_efm_intersection and len(all_efm_intersection):
-            f.write('All EFMs contain following %d reactions:\n\t%s.\n\n'
-                    % (len(all_efm_intersection), all_efm_intersection.to_string(binary=True)))
+
+        def get_key(r_id, c):
+            key = [0] if r_id in all_fm_intersection or r_id in all_fm_intersection_folded else []
+            if (r_id, c) in r_id2new_r_id:
+                key.append(r_id2new_r_id[(r_id, c)])
+            if (r_id, c) in r_id2cl_id:
+                key.append(r_id2cl_id[(r_id, c)])
+            key.append(r_id)
+            return tuple(key)
+
+        get_group = lambda r_id, c: r_id2cl_id[(r_id, c)] if (r_id, c) in r_id2cl_id else None
+
+        if all_fm_intersection and len(all_fm_intersection):
+            f.write('All EFMs contain following %d reactions:\n\t%s,\n\n'
+                    % (len(all_fm_intersection),
+                       all_fm_intersection.to_string(binary=True, get_key=get_key, get_group=get_group)))
+            if len(all_fm_intersection) > len(all_fm_intersection_folded):
+                f.write('or (with reaction groups folded):\n\t%s.\n\n'
+                        % all_fm_intersection_folded.to_string(binary=True, get_key=get_key))
             f.write(THICK_DELIMITER)
+
         for fm_id in sorted(id2fm.iterkeys()):
             fm = id2fm[fm_id]
-            r_id2st, p_id2st = fm_id2key[fm_id]
-            folded_efm_ids = key2folded_efm_ids[r_id2st, p_id2st]
-            yield_str = '' if not in_r_id else ' of yield %g' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev)
-            if len(folded_efm_ids) == 1:
-                folded_efm_id = next(iter(folded_efm_ids))
-                folded_efm = id2efm[folded_efm_id]
-
-                f.write('Folded EFM %s (a.k.a. pathway %s) of length %d%s.\n\n'
-                        % (folded_efm_id, fm_id, len(folded_efm), yield_str))
-                caption = 'Structure:\n\n\t'
-            else:
-                f.write('Pathway %s of length %d%s.\n\n' % (fm_id, len(fm), yield_str))
-                caption = None
-
-            f.write('Inputs: %s;\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
-                                                for (m_id, st) in r_id2st))
-            f.write('Outputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
-                                                   for (m_id, st) in p_id2st))
-
-            if len(folded_efm_ids) > 1:
-                f.write('Structure:\n\n\t%s\n\n' % fm.to_string(subpattern=all_efm_intersection))
-                f.write('Contains %d folded FMs:\n\n' % len(folded_efm_ids))
-
-            started = False
-            for folded_efm_id in folded_efm_ids:
-                if started:
-                    f.write(THIN_DELIMITER)
-                else:
-                    started = True
-                folded_efm = id2efm[folded_efm_id]
-                f.write(caption if caption else 'Folded EFM %s of length %d:\n\n\t' % (folded_efm_id, len(folded_efm)))
-                f.write('%s\n\n' % folded_efm.to_string(subpattern=all_efm_intersection))
-
-                f.write('Unfolds into %d EFM%s:\n\n' % (len(folded_efm_id2efm_ids[folded_efm_id]),
-                                                        's' if len(folded_efm_id2efm_ids[folded_efm_id]) != 1 else ''))
-                for efm_id in folded_efm_id2efm_ids[folded_efm_id]:
-                    efm = id2efm[efm_id]
-                    f.write('EFM %s of length %d of efficiency %g:\n\n\t%s\n\n'
-                            % (efm_id, len(efm), efm_id2efficiency[efm_id],
-                               efm.to_string(subpattern=all_efm_intersection)))
-                    f.write(THIN_DELIMITER)
+            write_pathway(fm_id, fm, fm_id2key, r_id, in_r_id, r_rev, in_r_rev, model, efm_id2efficiency,
+                          folded_efm_id2efm_ids, id2efm, key2folded_efm_ids, id2folded_efm, get_key, get_group, f)
             f.write(THICK_DELIMITER)
+
+
+def write_pathway(fm_id, fm, fm_id2key, r_id, in_r_id, r_rev, in_r_rev, model, efm_id2efficiency, folded_efm_id2efm_ids,
+                  id2efm, key2folded_efm_ids, id2folded_efm, get_key, get_group, f):
+    r_id2st, p_id2st = fm_id2key[fm_id]
+    f.write('Inputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
+                                        for (m_id, st) in r_id2st))
+    f.write('Outputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
+                                           for (m_id, st) in p_id2st))
+    f.write('Yield: %g;\n\n' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev))
+
+    if TYPE_FOLDED_EFM == fm.type:
+        write_folded_efm(fm_id, fm, efm_id2efficiency, folded_efm_id2efm_ids, id2efm, get_key, get_group, f)
+        return
+
+    if TYPE_EFM == fm.type:
+        write_efm(fm_id, fm, efm_id2efficiency, get_key, get_group, f)
+        return
+
+    f.write('%s of length %d:\n\n\t%s\n\n' % (fm_id, len(fm), fm.to_string(get_key=get_key, get_group=get_group)))
+    folded_efm_ids = key2folded_efm_ids[r_id2st, p_id2st]
+    f.write('\tContains %d elements:\n\n' % len(folded_efm_ids))
+    started = False
+    for f_efm_id in folded_efm_ids:
+        if started:
+            f.write('\t\t%s' % THIN_DELIMITER)
+        else:
+            started = True
+        write_folded_efm(f_efm_id, id2folded_efm[f_efm_id], efm_id2efficiency, folded_efm_id2efm_ids, id2efm,
+                         get_key, get_group, f, tab='\t\t')
+
+
+def write_folded_efm(f_efm_id, f_efm, efm_id2efficiency, folded_efm_id2efm_ids, id2efm,
+                     get_key, get_group, f, tab=''):
+    if TYPE_EFM == f_efm.type:
+        write_efm(f_efm_id, f_efm, efm_id2efficiency, get_key, get_group, f, tab)
+        return
+
+    f.write('%s%s of length %d:\n\n%s\t%s\n\n'
+            % (tab, f_efm_id, len(f_efm), tab, f_efm.to_string(get_key=get_key, get_group=get_group)))
+
+    efm_ids = folded_efm_id2efm_ids[f_efm_id]
+    f.write('%s\tUnfolds into %s' % (tab, ('the following %d EFMs:\n\n' % len(efm_ids)) if len(efm_ids) != 1 else ''))
+
+    started = False
+    for efm_id in efm_ids:
+        if started:
+            f.write('%s\t\t%s' % (tab, TINY_DELIMITER))
+        else:
+            started = True
+        write_efm(efm_id, id2efm[efm_id], efm_id2efficiency, get_key, get_group, f,
+                  tab='%s\t\t' % tab, no_first_tab=len(efm_ids) == 1)
+
+
+def write_efm(efm_id, efm, efm_id2efficiency, get_key, get_group, f,  tab='', no_first_tab=False):
+    f.write('%s%s of length %d of efficiency %g:\n\n%s\t%s\n\n'
+            % ('' if no_first_tab else tab, efm_id, len(efm), efm_id2efficiency[efm_id], tab,
+               efm.to_string(get_key=get_key, get_group=get_group)))
 
 
 def serialize_communities(id2cluster, id2intersection, id2imp_rns, total_len, all_fm_intersection, path):
     with open(path, 'w+') as f:
-        f.write('Analysed %d pathways\n\n' % total_len)
-        f.write(THIN_DELIMITER)
+        f.write('Analysed %d pathways. ' % total_len)
         if all_fm_intersection and len(all_fm_intersection):
             f.write('All pathways contain following %d reactions:\n\n\t%s.\n\n'
                     % (len(all_fm_intersection), all_fm_intersection.to_string(binary=True)))
-            f.write(THICK_DELIMITER)
+        else:
+            f.write('\n\n')
+        f.write(THICK_DELIMITER)
+
+        get_key = lambda r_id, c: (0, r_id) if all_fm_intersection and r_id in all_fm_intersection else (1, r_id)
+        get_group = lambda r_id, c: 1 if r_id in all_fm_intersection else None
+
         f.write('Found %d communities\n\n' % len(id2cluster))
-        all_r_ids = set(all_fm_intersection.to_r_id2coeff().iterkeys())
         for clu_id in sorted(id2cluster.iterkeys()):
             f.write(THIN_DELIMITER)
             cluster = id2cluster[clu_id]
             intersection = id2intersection[clu_id]
+            hidden_r_ids = set(intersection.to_r_id2coeff().iterkeys())
             imp_rns = id2imp_rns[clu_id]
             f.write('Community %d contains %d following pathways:\n\n\t%s\n\n'
                     % (clu_id, len(cluster), ', '.join(sorted(cluster))))
             f.write('all of which contain following reactions:\n\n\t%s\n\n'
-                    % (intersection.to_string(binary=True, subpattern=all_fm_intersection)))
+                    % (intersection.to_string(binary=True, get_key=get_key, get_group=get_group)))
             f.write('which form a reaction community, which also contains following reactions:\n\n\t %s\n\n'
-                    % imp_rns.to_string(binary=True, subpattern=intersection, show_subpattern=False,
-                                        key=lambda r_id: (0 if r_id in all_r_ids else 1, r_id)))
+                    % imp_rns.to_string(binary=True, hidden_r_ids=hidden_r_ids))
 
 
 def read_efms(output_efm_file):
@@ -108,7 +150,8 @@ def read_efms(output_efm_file):
                 continue
             efm_id = int(efm[0])
             efm = efm[1:]
-            id2efm[efm_id] = EFM(r_id2coeff={r_id: float(coeff) for (coeff, r_id) in (it.split(' ') for it in efm)})
+            id2efm[efm_id] = EFM(r_id2coeff={r_id: float(coeff) for (coeff, r_id) in (it.split(' ') for it in efm)},
+                                 type=TYPE_EFM)
     return id2efm
 
 
@@ -137,7 +180,7 @@ def serialize_clique(cl_id, clique, efm_ids, model, output_file):
     """
     with open(output_file, 'w+') as f:
         r_id2coeff = clique.to_r_id2coeff(binary=True)
-        f.write('Reaction group %d of length %d found in %d EFMs:\n\t%s\n\n'
+        f.write('Reaction group %d of length %d found in %d EFMs:\n\n\t%s\n\n'
                 % (cl_id, len(r_id2coeff), len(efm_ids), ', '.join(sorted(efm_ids))))
         f.write(THIN_DELIMITER)
         coeff2r_id = invert_map(r_id2coeff)
@@ -200,7 +243,7 @@ def serialize_fm(fm_id, fm, model, output_file, r_id, in_r_id, r_rev, in_r_rev):
     with open(output_file, 'w+') as f:
         r_id2coeff = fm.to_r_id2coeff()
         yield_str = '' if not in_r_id else ' of yield %g' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev)
-        f.write('Pathway %s of length %d%s\n\n' % (fm_id, len(r_id2coeff), yield_str))
+        f.write('%s of length %d%s\n\n' % (fm_id, len(r_id2coeff), yield_str))
         f.write(THIN_DELIMITER)
         coeff2r_id = invert_map(r_id2coeff)
         for coeff, r_ids in sorted(coeff2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
@@ -225,20 +268,19 @@ def serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, outpu
         cl_length = len(clique)
         cl_string = clique.to_string()
         efm_ids = cl_id2efm_ids[cl_id]
-        f.write(THIN_DELIMITER)
-        f.write("Reaction group %d of length %d:\n\n\t%s\n\nfound in %d EFMs:\n\n\t%s\n\n"
+        f.write('\t%s' % THIN_DELIMITER)
+        f.write("\tReaction group %d of length %d:\n\n\t\t%s\n\n\tfound in %d EFMs:\n\n\t\t%s\n\n"
                 % (cl_id, cl_length, cl_string, len(efm_ids), ', '.join(sorted(efm_ids))))
 
     with open(output_file, 'w+') as f:
-        f.write('Found %d coupled reaction groups of %d types (based on inputs and outputs).\n\n'
+        f.write('Found %d coupled reaction groups of %d types (Types are based on inputs and outputs).\n\n'
                 % (len(id2clique), len(key2cl_ids)))
         f.write(THICK_DELIMITER)
 
         for key_id in sorted(id2key.iterkeys()):
             r_id2st, p_id2st = id2key[key_id]
             cl_ids = key2cl_ids[(r_id2st, p_id2st)]
-            f.write('Type %d, contains %d reaction group%s.\n\n'
-                    % (key_id, len(cl_ids), 's' if len(cl_ids) != 1 else ''))
+            f.write('Type %d, contains %d reaction group%s.\n\n' % (key_id, len(cl_ids), 's' if len(cl_ids) != 1 else ''))
             f.write('Inputs: %s;\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
                                                 for (m_id, st) in r_id2st))
             f.write('Outputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)

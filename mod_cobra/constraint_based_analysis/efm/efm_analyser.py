@@ -24,9 +24,18 @@ def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_
             raise ValueError('No EFMs found :(. Probably, you forgot to specify TreeEFM path?')
 
     efm2efficiency = {efm: get_fm_efficiency(efm, target_r_id, target_r_reversed) for efm in efms}
-    id2efm = dict(zip((str(it) for it in xrange(0, len(efms))), sorted(efms, key=lambda efm: -efm2efficiency[efm])))
+    id2efm = {}
+    id2efficiency = {}
 
-    return id2efm, {efm_id: efm2efficiency[efm] for (efm_id, efm) in id2efm.iteritems()}
+    i = 0
+    for efm in sorted(efms, key=lambda efm: -efm2efficiency[efm]):
+        efm_id = 'EFM %d' % i
+        efm.id = efm_id
+        id2efm[efm_id] = efm
+        id2efficiency[efm_id] = efm2efficiency[efm]
+        i += 1
+
+    return id2efm, id2efficiency
 
 
 def group_efms(id2efm, model):
@@ -37,10 +46,16 @@ def group_efms(id2efm, model):
         key2efm_ids[r_id2st, p_id2st].append(efm_id)
     fm2key = {id2efm[efm_ids[0]].join([id2efm[efm_id] for efm_id in efm_ids[1:]]): key
               for (key, efm_ids) in key2efm_ids.iteritems()}
-    id2fm = dict(zip((str(it) for it in xrange(0, len(fm2key))),
-                     sorted(fm2key.iterkeys(), key=lambda fm: min(key2efm_ids[fm2key[fm]]))))
-
-    return id2fm, {fm_id: fm2key[fm] for (fm_id, fm) in id2fm.iteritems()}, key2efm_ids
+    id2fm = {}
+    id2key = {}
+    i = 0
+    for fm in sorted(fm2key.iterkeys(), key=lambda fm: min(key2efm_ids[fm2key[fm]])):
+        if not fm.id:
+            fm.id = 'Pathway %d' % i
+            i += 1
+        id2fm[fm.id] = fm
+        id2key[fm.id] = fm2key[fm]
+    return id2fm, id2key, key2efm_ids
 
 
 def calculate_imp_rn_threshold(total_len, imp_rn_threshold=None):

@@ -4,7 +4,7 @@ import logging
 from igraph import Graph
 from louvain import find_partition
 
-from mod_cobra.constraint_based_analysis.efm.EFM import EFM
+from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_PATTERN
 
 __author__ = 'anna'
 
@@ -53,7 +53,7 @@ def detect_reaction_communities(id2fm, threshold, min_len=2):
     partition = find_partition(graph=g, method='Modularity', weight='weight')
     clusters = [EFM(r_id2coeff=
                     {r_id if r_id.find('-') != 0 else r_id[1:]: 1 if r_id.find('-') != 0 else -1 for r_id in
-                     (g.vs[v_id]['name'] for v_id in cluster)})
+                     (g.vs[v_id]['name'] for v_id in cluster)}, type=TYPE_PATTERN)
                 for cluster in partition if len(cluster) >= min_len]
     return dict(zip(xrange(0, len(partition)), clusters))
 
@@ -92,4 +92,4 @@ def detect_reaction_community(r_ids, rev_r_ids, id2efm, threshold_percent, selec
 
 def cluster2fm(g, cluster):
     return EFM(r_id2coeff={r_id if r_id.find('-') != 0 else r_id[1:]: 1 if r_id.find('-') != 0 else -1 for r_id in
-                           (g.vs[v_id]['name'] for v_id in cluster)})
+                           (g.vs[v_id]['name'] for v_id in cluster)}, type=TYPE_PATTERN)
