@@ -17,7 +17,6 @@ def analyse_by_fva(cobra_model, bm_r_id, objective_sense='maximize', threshold=0
     if opt_value:
         opt_value = round_value(opt_value)
         r_id2bounds = get_r_id2fva_bounds(cobra_model, threshold=threshold)
-
         return r_id2bounds, opt_value
     return {}, None
 

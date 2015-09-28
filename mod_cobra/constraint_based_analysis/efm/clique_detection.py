@@ -8,7 +8,7 @@ from mod_sbml.utils.misc import invert_map
 
 from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_PATTERN
 from mod_sbml.sbml.submodel_manager import remove_unused_species, compress_reaction_participants
-from mod_sbml.sbml.sbml_manager import create_reaction
+from mod_sbml.sbml.sbml_manager import create_reaction, get_products, get_reactants
 
 __author__ = 'anna'
 
@@ -26,7 +26,7 @@ def detect_cliques(id2fm, model, min_clique_size=2):
 
     :return: id2clique
     """
-    logging.info("Going to rank reactions by FM number.")
+    logging.info("Going to detect coupled reactions...")
     r_id_pair2count = Counter()
     r_id2fm_ids = defaultdict(set)
 
@@ -72,10 +72,12 @@ def detect_cliques(id2fm, model, min_clique_size=2):
             r_id2coeff[r_1] = ratio * c_1
         return r_id2coeff
 
+    coupled_r_ids = set()
     clique2key = {}
     key2cliques = defaultdict(list)
     for clique in (clique for clique in find_cliques(gr) if len(clique) >= min_clique_size):
         r_id2coeff = clique2r_id2coeff(clique)
+        coupled_r_ids |= {(r_id, 1 if c > 0 else -1) for (r_id, c) in r_id2coeff.iteritems()}
         r_id2st, p_id2st = compress_reaction_participants(model, r_id2coeff)
         key = tuple(sorted(r_id2st.iteritems())), tuple(sorted(p_id2st.iteritems()))
         clique = EFM(r_id2coeff=r_id2coeff, type=TYPE_PATTERN)
@@ -86,12 +88,27 @@ def detect_cliques(id2fm, model, min_clique_size=2):
     id2clique = dict(zip(xrange(0, len(clique2key)), sorted(clique2key.iterkeys(),
                                                             key=lambda cl: (key2id[clique2key[cl]], -len(cl)))))
     clique2id = {cl: cl_id for (cl_id, cl) in id2clique.iteritems()}
+
+    key2r_ids = defaultdict(set)
+    for r in model.getListOfReactions():
+        r_id = r.getId()
+        if (r_id, 1) in coupled_r_ids and ((r_id, -1) in coupled_r_ids or not r.getReversible()):
+            continue
+
+        r_id_st = tuple(sorted(get_reactants(r, stoichiometry=True)))
+        p_id_st = tuple(sorted(get_products(r, stoichiometry=True)))
+
+        if (r_id, 1) not in coupled_r_ids:
+            key2r_ids[r_id_st, p_id_st].add((r_id, 1))
+        if r.getReversible() and (r_id, -1) not in coupled_r_ids:
+            key2r_ids[p_id_st, r_id_st].add((r_id, -1))
+
     return id2clique, {clique_id: r_id2fm_ids[rc2symbol(*clique.get_sample_r_id_coefficient_pair())]
                        for (clique_id, clique) in id2clique.iteritems()}, \
-           id2key, {key: [clique2id[cl] for cl in cliques] for (key, cliques) in key2cliques.iteritems()}
+           id2key, {key: [clique2id[cl] for cl in cliques] for (key, cliques) in key2cliques.iteritems()}, key2r_ids
 
 
-def clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, out_sbml):
+def clique2lumped_reaction(id2clique, id2key, key2cl_ids, key2r_ids, in_sbml, out_sbml):
     doc = libsbml.SBMLReader().readSBML(in_sbml)
     model = doc.getModel()
     cl_id2r_ids = {}
@@ -116,6 +133,11 @@ def clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, out_sbml):
                 r_id2new_r_id[r_id, coeff] = new_r_id
                 r_id2direction[r_id][0 if coeff > 0 else 1] = True
 
+        if key in key2r_ids:
+            for r_id, coeff in key2r_ids[key]:
+                r_id2new_r_id[r_id, coeff] = new_r_id
+                r_id2direction[r_id][0 if coeff > 0 else 1] = True
+
     for r_id, [d1, d2] in r_id2direction.iteritems():
         if d1 and (d2 or not model.getReaction(r_id).getReversible()):
             model.removeReaction(r_id)
@@ -127,8 +149,9 @@ def clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, out_sbml):
     return r_id2new_r_id, cl_id2new_r_id
 
 
-def fold_efms(id2efm, id2clique, cl_id2new_r_id):
-    efm_id2folded_efm = {efm_id: efm.fold_cliques(id2clique, cl_id2new_r_id) for (efm_id, efm) in id2efm.iteritems()}
+def fold_efms(id2efm, id2clique, cl_id2new_r_id, r_id2new_r_id):
+    efm_id2folded_efm = {efm_id: efm.fold_cliques(id2clique, cl_id2new_r_id, r_id2new_r_id)
+                         for (efm_id, efm) in id2efm.iteritems()}
     folded_efm2ids = invert_map(efm_id2folded_efm)
     id2folded_efm = {}
     folded_efm_id2efm_ids = {}

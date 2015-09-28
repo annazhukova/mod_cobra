@@ -5,7 +5,6 @@ import shutil
 
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
-from misc import invert_map
 
 from mod_cobra.constraint_based_analysis.efm.clique_detection import detect_cliques, clique2lumped_reaction, fold_efms
 from mod_cobra.constraint_based_analysis.efm.community_detection import detect_fm_communities, detect_reaction_community
@@ -67,11 +66,18 @@ def constraint_exchange_reactions(model, allowed_exchange_r_id2rev, cofactors=No
             set_bounds(r, 0 if (rs - cofactors) else r_l, max(r_u, 0))
 
 
-def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=ZERO_THRESHOLD, do_fva=True,
-                  do_fba=True, do_efm=True, efms=None, max_efm_number=1000,
+def _prepare_dir(super_dir, dir_name, log):
+    logging.info(log)
+    cur_dir = os.path.join(super_dir, dir_name)
+    create_dirs(cur_dir)
+    return cur_dir
+
+
+def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2rev=None, threshold=ZERO_THRESHOLD,
+                  do_fva=True, do_fba=True, do_efm=True, efms=None, max_efm_number=1000,
                   cofactors=None, mask_shift=4, get_f_path=None):
-    logging.info("Preparing directories...")
     # create directories to store results
+    logging.info("Preparing directories...")
     create_dirs(res_dir, False)
     if not get_f_path:
         get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
@@ -92,14 +98,13 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
     logging.info("Serializing model info...")
     info_prefix = os.path.join(res_dir, 'model_info_')
     c_csv, m_csv, r_csv = serialize_model_info(sbml, info_prefix)
-    in_sbml = sbml
-    doc = libsbml.SBMLReader().readSBML(in_sbml)
+    doc = libsbml.SBMLReader().readSBML(sbml)
     model = doc.getModel()
     r_string = lambda r, rev: '<b>%s</b>%s: %s' % (r.getId(), ' (reversed)' if rev else '',
                                                    get_sbml_r_formula(model, r, show_metabolite_ids=False))
     r = model.getReaction(out_r_id)
     description = describe('input_data.html', model_name=model.getName() if model.getName() else model.getId(),
-                           sbml_filepath=get_f_path(in_sbml), c_csv=get_f_path(c_csv),
+                           sbml_filepath=get_f_path(sbml), c_csv=get_f_path(c_csv),
                            m_csv=get_f_path(m_csv), r_csv=get_f_path(r_csv), obj_rn=r_string(r, out_rev),
                            in_rn_len=len(in_r_id2rev) if in_r_id2rev else 0,
                            in_rns=
@@ -109,32 +114,23 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
     r_id2mask = defaultdict(lambda: 0)
     layer2mask = {}
     main_layer = None
-
     objective_sense = 'minimize' if out_rev else 'maximize'
     vis_r_ids = set()
+    cobra_model = None
     if do_fva:
-        logging.info("Performing FVA...")
-        fva_dir = os.path.join(res_dir, 'fva')
-        create_dirs(fva_dir)
-
-        cobra_model = create_cobra_model_from_sbml_file(sbml)
+        cur_dir = _prepare_dir(res_dir, 'fva', "Performing FVA...")
+        cobra_model = create_cobra_model_from_sbml_file(sbml) if not cobra_model else cobra_model
         r_id2bounds, opt_val = analyse_by_fva(cobra_model=cobra_model, bm_r_id=out_r_id,
                                               objective_sense=objective_sense, threshold=threshold)
         ess_rn_num, var_rn_num = 0, 0
         if opt_val:
-            fva_file = os.path.join(fva_dir, 'fva.txt')
-            caption = '%s reaction %s (%s): %.4g\n==================================\n'\
-                      % (objective_sense, out_r_id,
-                         get_sbml_r_formula(model, model.getReaction(out_r_id), show_metabolite_ids=True,
-                                            show_compartments=False), opt_val)
-            ess_rn_num, var_rn_num = serialize_fva(cobra_model, r_id2bounds, fva_file,
-                                                   title=caption)
-            update_vis_layers({r_id: (1 if u > 0 else -1) for (r_id, (l, u)) in r_id2bounds.iteritems() if l * u > 0},
-                              'FVA essential', r_id2mask, layer2mask, mask_shift, vis_r_ids)
+            fva_file = os.path.join(cur_dir, 'fva.txt')
+            ess_rn_num, var_rn_num = serialize_fva(cobra_model, r_id2bounds, fva_file, objective_sense, out_r_id)
+            mask_shift = update_vis_layers(
+                {r_id: (1 if u > 0 else -1) for (r_id, (l, u)) in r_id2bounds.iteritems() if l * u > 0},
+                'FVA essential', r_id2mask, layer2mask, mask_shift, vis_r_ids)
             main_layer = 'FVA essential'
-            mask_shift += 1
-
-            fva_sbml = os.path.join(fva_dir, 'Model_FVA.xml')
+            fva_sbml = os.path.join(cur_dir, 'Model_FVA.xml')
             sbml = create_fva_model(sbml, r_id2bounds, fva_sbml)
             doc = libsbml.SBMLReader().readSBML(sbml)
             model = doc.getModel()
@@ -143,35 +139,22 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
                                 sbml_filepath=get_f_path(fva_sbml) if opt_val else None)
 
     if do_fba:
-        logging.info("Performing FBA...")
-        fba_dir = os.path.join(res_dir, 'fba')
-        create_dirs(fba_dir)
-
-        cobra_model = create_cobra_model_from_sbml_file(sbml)
+        cur_dir = _prepare_dir(res_dir, 'fba', "Performing FBA...")
+        cobra_model = create_cobra_model_from_sbml_file(sbml) if not cobra_model else cobra_model
         r_id2val, opt_val = analyse_by_fba(cobra_model, bm_r_id=out_r_id, objective_sense=objective_sense,
                                            threshold=threshold)
         if opt_val:
-            update_vis_layers(r_id2val, 'FBA', r_id2mask, layer2mask, mask_shift, vis_r_ids)
+            mask_shift = update_vis_layers(r_id2val, 'FBA', r_id2mask, layer2mask, mask_shift, vis_r_ids)
             main_layer = 'FBA'
-            mask_shift += 1
-
-            fba_file = os.path.join(fba_dir, 'fba.txt')
-            caption = '%s reaction %s (%s): %.4g\n==================================\n'\
-                      % (objective_sense, out_r_id,
-                         get_sbml_r_formula(model, model.getReaction(out_r_id), show_metabolite_ids=True,
-                                            show_compartments=False), opt_val)
-            serialize_fluxes(cobra_model, r_id2val, path=fba_file, title=caption)
+            fba_file = os.path.join(cur_dir, 'fba.txt')
+            serialize_fluxes(cobra_model, r_id2val, path=fba_file, objective_sense=objective_sense, out_r_id=out_r_id)
         description += describe('fba.html', optimal_value=opt_val, r_num=len(r_id2val),
                                 description_filepath=get_f_path(fba_file) if opt_val else None)
 
-    id2efm = None
     if do_efm:
-        logging.info("Performing EFMA...")
-        efm_dir = os.path.join(res_dir, 'efms/')
-        create_dirs(efm_dir)
-
+        cur_dir = _prepare_dir(res_dir, 'efma', "Performing EFMA...")
         id2efm, efm_id2efficiency = get_efms(target_r_id=out_r_id, target_r_reversed=out_rev, r_id2rev=in_r_id2rev,
-                                             sbml=sbml, directory=efm_dir, max_efm_number=max_efm_number,
+                                             sbml=sbml, directory=cur_dir, max_efm_number=max_efm_number,
                                              threshold=threshold, efms=efms)
 
         efm_num = len(id2efm)
@@ -179,59 +162,52 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             all_efm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2efm.itervalues(),
                                           next(id2efm.itervalues()))
 
+            # cliques
             sbml, clique_description, id2clique, r_id2new_r_id, cl_id2new_r_id = \
                 process_cliques(res_dir, get_f_path, id2efm, r_id2mask, sbml, model, vis_r_ids)
             description += clique_description
-
             doc = libsbml.SBMLReader().readSBML(sbml)
             model = doc.getModel()
 
-            all_efm_intersection_folded = all_efm_intersection.fold_cliques(id2clique, cl_id2new_r_id)
-
-            id2folded_efm, folded_efm_id2efm_ids = fold_efms(id2efm, id2clique, cl_id2new_r_id)
-
-            id2fm, fm_id2key, key2folded_efm_ids = group_efms(id2folded_efm, model)
+            all_efm_intersection_folded = all_efm_intersection.fold_cliques(id2clique, cl_id2new_r_id, r_id2new_r_id)
+            id2folded_efm, folded_efm_id2efm_ids = fold_efms(id2efm, id2clique, cl_id2new_r_id, r_id2new_r_id)
+            id2fm, fm_id2key, key2folded_efm_ids = group_efms(id2folded_efm, model, in_m_id, out_m_id)
             fm_num = len(id2fm)
-
             all_fm_intersection = reduce(lambda p1, p2: p1.intersection(p2), id2fm.itervalues(),
                                          next(id2fm.itervalues()))
 
-            if len(all_efm_intersection_folded):
-                update_vis_layers(all_efm_intersection_folded.to_r_id2coeff(binary=True),
-                                  'Folded EFM intersection', r_id2mask, layer2mask, mask_shift, vis_r_ids)
-                if not main_layer:
-                    main_layer = 'Folded EFM intersection'
-                mask_shift += 1
+            # if len(all_efm_intersection_folded):
+            #     update_vis_layers(all_efm_intersection_folded.to_r_id2coeff(binary=True),
+            #                       'Folded EFM intersection', r_id2mask, layer2mask, mask_shift, vis_r_ids)
+            #     if not main_layer:
+            #         main_layer = 'Folded EFM intersection'
+            #     mask_shift += 1
 
-            all_fm_file = os.path.join(efm_dir, 'pathways.txt')
-            in_r_id, in_r_rev = next(in_r_id2rev.iteritems()) if in_r_id2rev else (None, False)
+            all_fm_file = os.path.join(cur_dir, 'pathways.txt')
             r_id2cl_id = {}
             for cl_id, clique in id2clique.iteritems():
                 r_id2cl_id.update({(r_id, 1 if coeff > 0 else -1): cl_id
                                    for (r_id, coeff) in clique.to_r_id2coeff().iteritems()})
             serialize_fms_txt(id2fm, id2efm, fm_id2key, key2folded_efm_ids, all_fm_file, efm_id2efficiency,
                               id2folded_efm, folded_efm_id2efm_ids, r_id2new_r_id, r_id2cl_id,
-                              all_efm_intersection, all_efm_intersection_folded,
-                              model, out_r_id, out_rev, in_r_id, in_r_rev)
+                              all_efm_intersection, all_efm_intersection_folded, model, in_m_id, out_m_id)
 
             # 3 FMs
             limit = min(3, fm_num)
             mask_shift, fms \
-                = process_n_fms(directory=efm_dir, id2fm=id2fm, id2mask=r_id2mask,
+                = process_n_fms(directory=cur_dir, id2fm=id2fm, id2mask=r_id2mask,
                                 layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
                                 name='pathway', sorter=lambda (fm_id, _): fm_id,
                                 serializer=lambda fm_id, efm_txt:
-                                serialize_fm(fm_id, id2fm[fm_id], model, efm_txt,
-                                             out_r_id, in_r_id, out_rev, in_r_rev),
-                                suffix=lambda _: '', get_f_path=get_f_path, limit=limit, update_vis=True)
+                                serialize_fm(fm_id, id2fm[fm_id], fm_id2key[fm_id], in_m_id, out_m_id, model, efm_txt),
+                                suffix=lambda _: '', get_f_path=get_f_path, limit=limit, update_vis=False)
             fm_block = describe('fm_block.html', element_num=limit, characteristics='most effective',
                                 element_name='pathway', fms=fms)
             description += describe('efms.html', efm_num=efm_num, fm_num=fm_num,
                                     description_filepath=get_f_path(all_fm_file), selected_efm_block=fm_block)
 
             # Communities
-            comm_dir = os.path.join(efm_dir, 'communities')
-            create_dirs(comm_dir)
+            comm_dir = _prepare_dir(cur_dir, 'communities', "Analysing communities...")
             id2cluster = detect_fm_communities(id2fm, threshold=len(all_fm_intersection))
             id2intersection = {cl_id: reduce(lambda p1, p2: p1.intersection(p2),
                                              (id2fm[fm_id] for fm_id in cluster), id2fm[cluster[0]])
@@ -245,7 +221,6 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
             if id2cluster:
                 comm_txt = os.path.join(comm_dir, 'communities.txt')
                 serialize_communities(id2cluster, id2intersection, id2imp_rns, fm_num, all_fm_intersection, comm_txt)
-                # All clusters
                 limit = len(id2cluster)
                 mask_shift, fms \
                     = process_n_fms(directory=comm_dir, id2fm=id2imp_rns, id2mask=r_id2mask,
@@ -264,18 +239,18 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_r_id2rev=None, threshold=
     if not vis_r_ids:
         description += describe('nothing_found.html')
 
-    return sbml, vis_r_ids, description, mask_shift, r_id2mask, layer2mask, main_layer, id2efm
+    return sbml, vis_r_ids, description, mask_shift, r_id2mask, layer2mask, main_layer
 
 
 def process_cliques(res_dir, get_f_path, id2efm, id2mask, in_sbml, model, vis_r_ids, id2color=None):
     clique_merged_sbml = in_sbml
     clique_dir = os.path.join(res_dir, 'coupled_reactions')
     create_dirs(clique_dir)
-    id2clique, cl_id2efm_ids, id2key, key2cl_ids = detect_cliques(id2efm, model)
+    id2clique, cl_id2efm_ids, id2key, key2cl_ids, key2r_ids = detect_cliques(id2efm, model)
     cl_id2new_r_id, r_id2new_r_id = {}, {}
     if id2clique:
         cliques_txt = os.path.join(clique_dir, 'coupled_reactions.txt')
-        serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, cliques_txt)
+        serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, key2r_ids, cliques_txt)
         # 5 longest cliques
         limit = min(5, len(id2clique))
         _, fms \
@@ -288,7 +263,8 @@ def process_cliques(res_dir, get_f_path, id2efm, id2mask, in_sbml, model, vis_r_
                             element_name='coupled reaction group', fms=fms, all=limit == len(id2clique))
 
         clique_merged_sbml = os.path.join(clique_dir, 'Model_lumped.xml')
-        r_id2new_r_id, cl_id2new_r_id = clique2lumped_reaction(id2clique, id2key, key2cl_ids, in_sbml, clique_merged_sbml)
+        r_id2new_r_id, cl_id2new_r_id = clique2lumped_reaction(id2clique, id2key, key2cl_ids, key2r_ids, in_sbml,
+                                                               clique_merged_sbml)
         vis_r_ids |= {cl_id for ((r_id, _), cl_id) in r_id2new_r_id.iteritems() if r_id in vis_r_ids}
         for (r_id, coeff), new_r_id in r_id2new_r_id.iteritems():
             if (r_id, coeff) in id2mask:
@@ -311,25 +287,22 @@ def mean(values):
 
 def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_efm=True, max_efm_number=1000):
     create_dirs(res_dir, True)
+    get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
+
     mask_shift = 4
     tab2html = {}
     layer2mask = {}
-
-    get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
-
     invisible_layers = []
-    sbml2id2efm = {}
-
     sbml2id2mask = {}
     sbml2vis_r_ids = {}
     sbml2name = {}
-    for sbml, (out_r_id, out_rev, in_r_id2rev, name) in sbml2parameters.iteritems():
+    for sbml, (out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id, name) in sbml2parameters.iteritems():
         logging.info('Analysing %s...' % name)
-        sub_sbml, r_ids, description, mask_shift, cur_id2mask, cur_layer2mask, main_layer, id2efm = \
-            analyse_model(sbml, out_r_id, out_rev, os.path.join(res_dir, name), in_r_id2rev,
-                          do_fva=do_fva, do_fba=do_fba, do_efm=do_efm, mask_shift=mask_shift,
-                          get_f_path=get_f_path, max_efm_number=max_efm_number)
-        # sbml2id2efm[sbml] = id2efm
+        sub_sbml, r_ids, description, mask_shift, cur_id2mask, cur_layer2mask, main_layer = \
+            analyse_model(sbml=sbml, out_r_id=out_r_id, out_rev=out_rev, in_r_id2rev=in_r_id2rev, in_m_id=in_m_id,
+                          out_m_id=out_m_id, res_dir=os.path.join(res_dir, name), do_fva=do_fva, do_fba=do_fba,
+                          do_efm=do_efm, mask_shift=mask_shift, get_f_path=get_f_path, max_efm_number=max_efm_number)
+
         tab2html['Analysis of %s' % name] = description, None
         layer2mask.update({'%s: %s' % (name, layer): mask for (layer, mask) in cur_layer2mask.iteritems()})
         invisible_layers.extend(['%s: %s' % (name, layer) for layer in cur_layer2mask.iterkeys() if layer != main_layer])
@@ -340,9 +313,8 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
     if len(sbml2name) > 1:
         mm_dir = os.path.join(res_dir, 'merged_model')
         create_dirs(mm_dir)
-        id2color, id2efm, id2mask, info, sbml, model, vis_r_ids = \
-            join_models(get_f_path, mm_dir, sbml2id2efm, sbml2id2mask, sbml2name, sbml2vis_r_ids,
-                        sbml2name.keys(), tab2html)
+        id2color, id2mask, info, sbml, vis_r_ids = \
+            join_models(get_f_path, mm_dir, sbml2id2mask, sbml2name, sbml2vis_r_ids, sbml2name.keys(), tab2html)
         title = 'Combined model analysis'
     else:
         sbml = next(sbml2name.iterkeys())
@@ -351,15 +323,6 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         id2color = None
         info = ''
         title = 'Model analysis'
-
-    # if id2efm:
-    #     doc = libsbml.SBMLReader().readSBML(sbml)
-    #     model = doc.getModel()
-    #     sbml, description = process_cliques(res_dir, get_f_path, id2efm, id2mask, sbml, model, vis_r_ids, id2color)
-    #     if 'Model comparison' in tab2html:
-    #         tab2html['Model comparison'] = tab2html['Model comparison'][0] + description, None
-    #     else:
-    #         tab2html['Coupled reactions'] = description, None
 
     visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html)
 
@@ -375,14 +338,10 @@ def visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_l
                  id2color=id2color, tabs=None, info=info, invisible_layers=invisible_layers)
 
 
-def join_models(get_f_path, res_dir, sbml2id2efm, sbml2id2mask, sbml2name, sbml2vis_r_ids,
-                sbml_files, tab2html):
+def join_models(get_f_path, res_dir, sbml2id2mask, sbml2name, sbml2vis_r_ids, sbml_files, tab2html):
     merged_sbml = os.path.join(res_dir, 'Merged_model.xml')
     sbml2id2id, sbml2rev_r_ids, common_ids = merge_models(sbml_files, merged_sbml, sbml2name)
-    doc = libsbml.SBMLReader().readSBML(merged_sbml)
-    model = doc.getModel()
-    # r_ids = sorted((r.getId() for r in model.getListOfReactions()))
-    # rev_r_ids = {r.getId() for r in model.getListOfReactions() if r.getReversible()}
+
     if common_ids:
         logging.info('Merged all the models into %s.' % merged_sbml)
         comparison_prefix = os.path.join(res_dir, 'Model_comparison_')
@@ -399,15 +358,13 @@ def join_models(get_f_path, res_dir, sbml2id2efm, sbml2id2mask, sbml2name, sbml2
                  r_csv=get_f_path(r_csv) if cr_num else None), None
     id2mask = defaultdict(lambda: 0)
     vis_r_ids = set()
-    id2efm = {}
     for sbml in sbml_files:
         id2mask.update({(t_id, t_coeff): id2mask[(t_id, t_coeff)] | mask
                         for (t_id, t_coeff, mask) in
                         ((sbml2id2id[sbml][s_id], coeff if s_id not in sbml2rev_r_ids[sbml] else -coeff, mask)
                          for ((s_id, coeff), mask) in sbml2id2mask[sbml].iteritems() if s_id in sbml2id2id[sbml])})
         vis_r_ids |= {sbml2id2id[sbml][r_id] for r_id in sbml2vis_r_ids[sbml] if r_id in sbml2id2id[sbml]}
-        # id2efm.update({'%s_%s' % (sbml2name[sbml], efm_id): efm.translate(sbml2id2id[sbml], r_ids, rev_r_ids)
-        #                for (efm_id, efm) in sbml2id2efm[sbml].iteritems()})
+
     colors = get_n_colors(len(sbml_files) + 1, 0.5, 0.8)
     info = ''
     if common_ids:
@@ -421,16 +378,19 @@ def join_models(get_f_path, res_dir, sbml2id2efm, sbml2id2mask, sbml2name, sbml2
         r, g, b = color
         id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.itervalues()})
         info += describe('color.html', r=r, g=g, b=b, name=sbml2name[sbml])
-    return id2color, id2efm, id2mask, info, merged_sbml, model, vis_r_ids
+    return id2color, id2mask, info, merged_sbml, vis_r_ids
 
 
 def update_vis_layers(r_id2val, layer, id2mask, layer2mask, mask_shift, vis_r_ids):
+    if not r_id2val:
+        return mask_shift
     l_mask = 1 << mask_shift
     layer2mask[layer] = l_mask
     for r_id, val in r_id2val.iteritems():
         o_r_id = format_r_id(r_id)
         vis_r_ids |= {r_id, o_r_id}
         id2mask[(r_id, 1 if val > 0 else -1)] |= l_mask
+    return mask_shift + 1
 
 
 def get_full_id2mask(r_id2mask, model):
@@ -460,8 +420,7 @@ def process_n_fms(directory, id2fm, id2mask, layer2mask, mask_shift, vis_r_ids,
         fms.append((c_name, fm_id, len(fm), suffix(fm_id), get_f_path(fm_txt)))
 
         if update_vis:
-            update_vis_layers(r_id2coeff, fm_name, id2mask, layer2mask, mask_shift, vis_r_ids)
-            mask_shift += 1
+            mask_shift = update_vis_layers(r_id2coeff, fm_name, id2mask, layer2mask, mask_shift, vis_r_ids)
 
         limit -= 1
         if limit <= 0:

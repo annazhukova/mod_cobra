@@ -17,8 +17,7 @@ __author__ = 'anna'
 
 def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2folded_efm_ids, path, efm_id2efficiency,
                       id2folded_efm, folded_efm_id2efm_ids, r_id2new_r_id, r_id2cl_id,
-                      all_fm_intersection, all_fm_intersection_folded,
-                      model, r_id, r_rev, in_r_id, in_r_rev):
+                      all_fm_intersection, all_fm_intersection_folded, model, in_m_id, out_m_id):
     with open(path, 'w+') as f:
         f.write('Found %d EFMs, folded into %d EFMs, grouped into %d pathways:\n\n'
                 % (len(id2efm), len(id2folded_efm), len(id2fm)))
@@ -44,21 +43,24 @@ def serialize_fms_txt(id2fm, id2efm, fm_id2key, key2folded_efm_ids, path, efm_id
                         % all_fm_intersection_folded.to_string(binary=True, get_key=get_key))
             f.write(THICK_DELIMITER)
 
-        for fm_id in sorted(id2fm.iterkeys()):
-            fm = id2fm[fm_id]
-            write_pathway(fm_id, fm, fm_id2key, r_id, in_r_id, r_rev, in_r_rev, model, efm_id2efficiency,
-                          folded_efm_id2efm_ids, id2efm, key2folded_efm_ids, id2folded_efm, get_key, get_group, f)
+        fm_id2yield = {fm_id: get_fm_yield(fm_id2key[fm_id], in_m_id, out_m_id) for fm_id in id2fm.iterkeys()}
+        for fm_id, fm in sorted(id2fm.iteritems(),
+                                key=lambda (fm_id, fm): (-fm_id2yield[fm_id] if fm_id2yield[fm_id] else 0, fm_id)):
+            write_pathway(fm_id, fm, fm_id2key, model, efm_id2efficiency,
+                          folded_efm_id2efm_ids, id2efm, key2folded_efm_ids, id2folded_efm, fm_id2yield[fm_id],
+                          get_key, get_group, f)
             f.write(THICK_DELIMITER)
 
 
-def write_pathway(fm_id, fm, fm_id2key, r_id, in_r_id, r_rev, in_r_rev, model, efm_id2efficiency, folded_efm_id2efm_ids,
-                  id2efm, key2folded_efm_ids, id2folded_efm, get_key, get_group, f):
+def write_pathway(fm_id, fm, fm_id2key, model, efm_id2efficiency, folded_efm_id2efm_ids,
+                  id2efm, key2folded_efm_ids, id2folded_efm, fm_yield, get_key, get_group, f):
     r_id2st, p_id2st = fm_id2key[fm_id]
     f.write('Inputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
                                         for (m_id, st) in r_id2st))
     f.write('Outputs: %s;\n\n' % ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
                                            for (m_id, st) in p_id2st))
-    f.write('Yield: %g;\n\n' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev))
+    if fm_yield is not None:
+        f.write('Yield: %g;\n\n' % fm_yield)
 
     if TYPE_FOLDED_EFM == fm.type:
         write_folded_efm(fm_id, fm, efm_id2efficiency, folded_efm_id2efm_ids, id2efm, get_key, get_group, f)
@@ -81,8 +83,7 @@ def write_pathway(fm_id, fm, fm_id2key, r_id, in_r_id, r_rev, in_r_rev, model, e
                          get_key, get_group, f, tab='\t\t')
 
 
-def write_folded_efm(f_efm_id, f_efm, efm_id2efficiency, folded_efm_id2efm_ids, id2efm,
-                     get_key, get_group, f, tab=''):
+def write_folded_efm(f_efm_id, f_efm, efm_id2efficiency, folded_efm_id2efm_ids, id2efm, get_key, get_group, f, tab=''):
     if TYPE_EFM == f_efm.type:
         write_efm(f_efm_id, f_efm, efm_id2efficiency, get_key, get_group, f, tab)
         return
@@ -230,7 +231,7 @@ def serialize_community(c_id, community_intersection, imp_rns, efm_ids, model, o
                 f.write('\n')
 
 
-def serialize_fm(fm_id, fm, model, output_file, r_id, in_r_id, r_rev, in_r_rev):
+def serialize_fm(fm_id, fm, (r_id2st, p_id2st), in_m_id, out_m_id, model, output_file):
     """
     Serializes a FM to a file.
 
@@ -242,7 +243,8 @@ def serialize_fm(fm_id, fm, model, output_file, r_id, in_r_id, r_rev, in_r_rev):
     """
     with open(output_file, 'w+') as f:
         r_id2coeff = fm.to_r_id2coeff()
-        yield_str = '' if not in_r_id else ' of yield %g' % get_fm_yield(fm, r_id, in_r_id, r_rev, in_r_rev)
+        yield_str = '' if not in_m_id or not out_m_id else \
+            ' of yield %g' % get_fm_yield((r_id2st, p_id2st), in_m_id, out_m_id)
         f.write('%s of length %d%s\n\n' % (fm_id, len(r_id2coeff), yield_str))
         f.write(THIN_DELIMITER)
         coeff2r_id = invert_map(r_id2coeff)
@@ -254,7 +256,7 @@ def serialize_fm(fm_id, fm, model, output_file, r_id, in_r_id, r_rev, in_r_rev):
             f.write('\n')
 
 
-def serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, output_file):
+def serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, key2r_ids, output_file):
     """
     Serializes cliques to a file, one clique per line. Cliques are represented as ids of the active reactions
     (for the reversed reactions, the id is preceded by minus), e.g. -R1 R3 -R7 R11 R25.
@@ -288,5 +290,13 @@ def serialize_cliques(model, id2clique, cl_id2efm_ids, id2key, key2cl_ids, outpu
 
             for cl_id in sorted(cl_ids):
                 log_clique(cl_id, f)
+
+            if (r_id2st, p_id2st) in key2r_ids:
+                f.write('\t%s' % THIN_DELIMITER)
+                r_ids = key2r_ids[(r_id2st, p_id2st)]
+                f.write('\tReaction%s %s also ha%s the same structure.\n\n'
+                        % ('s' if len(r_ids) != 1 else '',
+                           ', '.join((('-%s' % r_id) if c < 0 else r_id for (r_id, c) in r_ids)),
+                           's' if len(r_ids) == 1 else 've'))
 
             f.write(THICK_DELIMITER)

@@ -67,8 +67,8 @@ class EFM(object):
         clique_started = None
         started = False
         for r_id in sorted(self.r_id2coeff.iterkeys(),
-                           key=lambda r_id: get_key(r_id, coeff_to_binary(self.r_id2coeff[r_id]))):
-            cl_id = get_group(r_id, coeff_to_binary(self.r_id2coeff[r_id]))
+                           key=lambda r_id: get_key(r_id, coeff_to_binary(self[r_id]))):
+            cl_id = get_group(r_id, coeff_to_binary(self[r_id]))
             if cl_id != clique_started:
                 if clique_started:
                     result.append(')')
@@ -80,9 +80,9 @@ class EFM(object):
 
             if not hidden_r_ids or r_id not in hidden_r_ids:
                 if binary:
-                    result.append('%s%s%s' % ('\t' if started else '', '-' if self.r_id2coeff[r_id] < 0 else '', r_id))
+                    result.append('%s%s%s' % ('\t' if started else '', '-' if self[r_id] < 0 else '', r_id))
                 else:
-                    result.append('%s%g %s' % ('\t' if started else '', self.r_id2coeff[r_id], r_id))
+                    result.append('%s%g %s' % ('\t' if started else '', self[r_id], r_id))
                 started = True
 
         if clique_started:
@@ -122,21 +122,25 @@ class EFM(object):
         return EFM(r_id2coeff=r_id2coeff, type=TYPE_PATTERN)
 
     def __getitem__(self, r_id):
-        return self.r_id2coeff[r_id] if r_id in self.r_id2coeff else 0
+        return self.r_id2coeff[r_id] if r_id in self else 0
 
     def __contains__(self, r_id):
         return r_id in self.r_id2coeff
 
-    def fold_cliques(self, id2clique, cl_id2new_r_id):
+    def fold_cliques(self, id2clique, cl_id2new_r_id, r_id2new_r_id):
         new_r_id2coeff = Counter()
         replaced_r_ids = set()
         for cl_id, clique in id2clique.iteritems():
             r_id, coeff = clique.get_sample_r_id_coefficient_pair()
-            if r_id in self.r_id2coeff:
-                ratio = 1.0 * self.r_id2coeff[r_id] / coeff
+            if r_id in self:
+                ratio = 1.0 * self[r_id] / coeff
                 if ratio > 0:
                     replaced_r_ids |= set(clique.r_id2coeff.iterkeys())
                     new_r_id2coeff.update({cl_id2new_r_id[cl_id]: ratio})
+        for (r_id, coeff), new_r_id in r_id2new_r_id.iteritems():
+            if r_id not in replaced_r_ids and r_id in self and coeff * self[r_id] > 0:
+                replaced_r_ids.add(r_id)
+                new_r_id2coeff.update({new_r_id: self[r_id]})
         if not replaced_r_ids:
             return self
         new_r_id2coeff.update({r_id: coeff for (r_id, coeff) in self.r_id2coeff.iteritems()

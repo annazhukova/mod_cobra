@@ -9,7 +9,7 @@ from mod_cobra.constraint_based_analysis import round_value
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.model_manager import get_transport_reactions, \
     get_boundary_reactions
 from mod_sbml.serialization.plot_manager import create_plot, save_fig, create_subplot, initialise_fig
-from mod_sbml.serialization.serialization_manager import get_cobra_r_formula
+from mod_sbml.serialization.serialization_manager import get_cobra_r_formula, get_sbml_r_formula
 
 __author__ = 'anna'
 
@@ -210,12 +210,15 @@ def get_fluxes_larger_than_threshold(model, threshold=0):
     return r_id2val
 
 
-def serialize_fluxes(model, r_id2val, path, r_ids=None, title=None):
+def serialize_fluxes(model, r_id2val, path, objective_sense, out_r_id):
+    title = '%s reaction %s (%s): %.4g\n==================================\n'\
+              % (objective_sense, out_r_id, get_sbml_r_formula(model, model.getReaction(out_r_id),
+                                                               show_metabolite_ids=True, show_compartments=False),
+                 r_id2val[out_r_id])
     value2rn = defaultdict(list)
     for r_id, value in r_id2val.iteritems():
-        if not r_ids or r_id in r_ids:
-            rn = model.reactions.get_by_id(r_id)
-            value2rn[value].append(r_id + ": " + get_cobra_r_formula(rn, comp=True))
+        rn = model.reactions.get_by_id(r_id)
+        value2rn[value].append(r_id + ": " + get_cobra_r_formula(rn, comp=True))
 
     prev_value = None
     with open(path, 'w+') as f:
@@ -277,7 +280,12 @@ def get_r_id2fva_bounds(model, threshold=None, rs=None):
     return r_id2bounds
 
 
-def serialize_fva(model, r_id2bounds, path, r_ids=None, title=None):
+def serialize_fva(model, r_id2bounds, path, objective_sense, out_r_id):
+    title = '%s reaction %s (%s): %.4g\n==================================\n'\
+              % (objective_sense, out_r_id, get_sbml_r_formula(model, model.getReaction(out_r_id),
+                                                               show_metabolite_ids=True, show_compartments=False),
+                 r_id2bounds[out_r_id][0])
+
     values2r_ids = defaultdict(set)
     for r_id, (min_v, max_v) in r_id2bounds.iteritems():
         values2r_ids[(min_v, max_v)].add(r_id)
@@ -290,8 +298,6 @@ def serialize_fva(model, r_id2bounds, path, r_ids=None, title=None):
         for (min_v, max_v) in keys:
             if min_v * max_v > 0:
                 v_r_ids = values2r_ids[(min_v, max_v)]
-                if r_ids:
-                    v_r_ids = set(v_r_ids) & r_ids
                 value = format_values(min_v, max_v)
                 ess_count += len(v_r_ids)
                 for r_id in sorted(v_r_ids):
@@ -302,8 +308,6 @@ def serialize_fva(model, r_id2bounds, path, r_ids=None, title=None):
         for (min_v, max_v) in keys:
             if min_v * max_v <= 0:
                 v_r_ids = values2r_ids[(min_v, max_v)]
-                if r_ids:
-                    v_r_ids = set(v_r_ids) & r_ids
                 value = format_values(min_v, max_v)
                 var_count += len(v_r_ids)
                 for r_id in sorted(v_r_ids):

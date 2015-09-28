@@ -1,7 +1,7 @@
 from collections import defaultdict
 import logging
 
-from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_efficiency
+from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_efficiency, get_fm_yield
 from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.efm.efm_manager import compute_efms
 from mod_sbml.sbml.submodel_manager import compress_reaction_participants
@@ -38,18 +38,19 @@ def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_
     return id2efm, id2efficiency
 
 
-def group_efms(id2efm, model):
+def group_efms(id2efm, model, in_m_id, out_m_id):
     key2efm_ids = defaultdict(list)
     for efm_id, efm in id2efm.iteritems():
         r_id2st, p_id2st = compress_reaction_participants(model, efm.to_r_id2coeff())
-        r_id2st, p_id2st =tuple(sorted(r_id2st.iteritems())), tuple(sorted(p_id2st.iteritems()))
+        r_id2st, p_id2st = tuple(sorted(r_id2st.iteritems())), tuple(sorted(p_id2st.iteritems()))
         key2efm_ids[r_id2st, p_id2st].append(efm_id)
     fm2key = {id2efm[efm_ids[0]].join([id2efm[efm_id] for efm_id in efm_ids[1:]]): key
               for (key, efm_ids) in key2efm_ids.iteritems()}
     id2fm = {}
     id2key = {}
     i = 0
-    for fm in sorted(fm2key.iterkeys(), key=lambda fm: min(key2efm_ids[fm2key[fm]])):
+    for fm in sorted(fm2key.iterkeys(), reverse=True,
+                     key=lambda fm: (get_fm_yield(fm2key[fm], in_m_id, out_m_id), max(key2efm_ids[fm2key[fm]]))):
         if not fm.id:
             fm.id = 'Pathway %d' % i
             i += 1
