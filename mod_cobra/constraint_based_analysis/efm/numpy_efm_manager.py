@@ -76,12 +76,14 @@ def replace_zeros(array, threshold=ZERO_THRESHOLD):
 
 def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
     coupled_r_ids = reduce(lambda s1, s2: s1 | set(s2), coupled_r_id_groups, set())
-    ordered_r_ids = [r_id for r_id in r_id2i.iterkeys() if r_id not in coupled_r_ids]
+    ordered_r_ids = [r_id for r_id in sorted(r_id2i.iterkeys(), key=lambda r_id: r_id2i[r_id])
+                     if r_id not in coupled_r_ids]
     new_r_id2i = dict(zip(ordered_r_ids, xrange(0, len(ordered_r_ids))))
     indices = tuple((r_id2i[r_id] for r_id in ordered_r_ids))
     N_new = N[:, indices]
     V_new = V[indices, :]
     r_id2lr_id = {}
+    lr_id2r_id2c = {}
     for r_ids, i in zip(coupled_r_id_groups, xrange(len(ordered_r_ids), len(ordered_r_ids) + len(coupled_r_id_groups))):
         lumped_r_id = 'lr_%d' % i
         r_id2lr_id.update({r_id: lumped_r_id for r_id in r_ids})
@@ -90,15 +92,16 @@ def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
         sample_r_index = r_id2i[r_ids[0]]
         sample_efm_index = np.nonzero(V[sample_r_index, :])[0][0]
         sample_efm = V[:, sample_efm_index]
-        c = sample_efm[sample_r_index] * 1.0
-        lambdas = np.array([[sample_efm[r_id2i[r_id]] / c] for r_id in r_ids])
-        indices = tuple((r_id2i[r_id] for r_id in r_ids))
-        r_new = np.dot(N[:, indices], lambdas)
+        c = abs(sample_efm[sample_r_index]) * 1.0
+        sign = 1 if sample_efm[sample_r_index] > 0 else -1
+        lr_id2r_id2c[lumped_r_id] = {r_id: sample_efm[r_id2i[r_id]] / c for r_id in r_ids}
+        lambdas = np.array([[lr_id2r_id2c[lumped_r_id][r_id]] for r_id in r_ids])
+        r_new = np.dot(N[:, tuple((r_id2i[r_id] for r_id in r_ids))], lambdas)
         replace_zeros(r_new)
         N_new = np.concatenate((N_new, r_new), axis=1)
-        V_new = np.concatenate((V_new, [V[sample_r_index, :] / c]), axis=0)
+        V_new = np.concatenate((V_new, [V[sample_r_index, :] * sign]), axis=0)
 
-    return N_new, V_new, new_r_id2i, r_id2lr_id
+    return N_new, V_new, new_r_id2i, r_id2lr_id, lr_id2r_id2c
 
 
 def get_reaction_duplicates(N, r_id2i):
@@ -113,7 +116,7 @@ def remove_reaction_duplicates(N, V, r_id_groups, r_id2i):
     indices = tuple((r_id2i[r_id] for r_id in ordered_r_ids))
     N_new = N[:, indices]
     V_new = V[indices, :]
-    r_id2lambda = {}
+    gr_id2r_id2c = {}
     for r_ids, i in zip(r_id_groups, xrange(len(ordered_r_ids), len(ordered_r_ids) + len(r_id_groups))):
         grouped_r_id = 'gr_%d' % i
         r_id2gr_id.update({r_id: grouped_r_id for r_id in r_ids})
@@ -125,13 +128,13 @@ def remove_reaction_duplicates(N, V, r_id_groups, r_id2i):
         sample_m = N[sample_m_index, :]
         st = sample_m[sample_r_index] * 1.0
         indices = tuple((r_id2i[r_id] for r_id in r_ids))
-        r_id2lambda.update({r_id: sample_m[r_id2i[r_id]] / st for r_id in r_ids})
+        gr_id2r_id2c[grouped_r_id] = {r_id: sample_m[r_id2i[r_id]] / st for r_id in r_ids}
 
         N_new = np.concatenate((N_new, N[:, (sample_r_index, )]), axis=1)
-        v_new = np.dot(np.array([r_id2lambda[r_id] for r_id in r_ids]), V[indices, :])
+        v_new = np.dot(np.array([gr_id2r_id2c[grouped_r_id][r_id] for r_id in r_ids]), V[indices, :])
         replace_zeros(v_new)
         V_new = np.vstack((V_new, v_new))
-    return N_new, V_new, new_r_id2i, r_id2gr_id, r_id2lambda
+    return N_new, V_new, new_r_id2i, r_id2gr_id, gr_id2r_id2c
 
 
 def get_efm_duplicates(V, efm_id2i):
@@ -161,6 +164,18 @@ def get_boundary_metabolites(N, v):
     divider = 1.0 * min((abs(it) for it in ms if it))
     ms /= divider
     return np.array([round_value(it) for it in ms])
+
+
+def get_efm_intersection(V, r_id2i):
+    result = {}
+    for r_id, i in r_id2i.iteritems():
+        r = V[i, :]
+        replace_zeros(r)
+        if r[r > 0].shape[0] == r.shape[0]:
+            result[r_id] = 1
+        elif r[r < 0].shape[0] == r.shape[0]:
+            result[r_id] = -1
+    return result
 
 
 def get_efm_groups_based_on_boundary_metabolites(N, V, efm_id2i):

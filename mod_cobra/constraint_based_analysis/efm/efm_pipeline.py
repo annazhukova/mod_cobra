@@ -93,18 +93,20 @@ def analyse_model_efm(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_
                                            tree_efm_path, max_efm_number, threshold)
 
     # # Step 2: lump coupled reactions
-    N_d, V_dd, d_r_id2i, d_efm_id2i, efm_id2gr_id = step2(N, V, r_id2i, efm_id2i)
-    # N_d, V_dd, d_r_id2i, d_efm_id2i, efm_id2gr_id = fake_step2(N, V, r_id2i, efm_id2i)
+    N_d, V_dd, d_r_id2i, d_efm_id2i, efm_id2gr_id, r_id2gr_id, r_id2mr_id, lr_id2r_id2c, gr_id2r_id2c = \
+        step2(N, V, r_id2i, efm_id2i)
+    # N_d, V_dd, d_r_id2i, d_efm_id2i, efm_id2gr_id, r_id2gr_id, r_id2mr_id, lr_id2r_id2c, gr_id2r_id2c = \
+    #     N, V, r_id2i, efm_id2i, {}, {}, {}, {}, {}
 
     # # Step 3: merge pathways based on boundary metabolites
     V_m, m_efm_id2i, efm_id2merged_id = step3(model, N_d, V_dd, d_efm_id2i, m_id2i)
-    # V_m, m_efm_id2i, efm_id2merged_id = fake_step3(V_dd, d_efm_id2i)
-
+    # V_m, m_efm_id2i, efm_id2merged_id = V_dd, d_efm_id2i, {}
 
     serialize(model=model, m_id2i=m_id2i, N_m=N_d, V=V, V_c=V_dd, V_m=V_m,
               r_id2i=r_id2i, c_r_id2i=d_r_id2i, efm_id2i=efm_id2i, gr_efm_id2i=d_efm_id2i, m_efm_id2i=m_efm_id2i,
               efm_id2gr_id=efm_id2gr_id, efm_id2merged_id=efm_id2merged_id,
               out_m_id=out_m_id, in_m_id=in_m_id, out_r_id=out_r_id,
+              r_id2gr_id=r_id2gr_id, r_id2mr_id=r_id2mr_id, gr_id2r_id2c=lr_id2r_id2c, mr_id2r_id2c=gr_id2r_id2c,
               path=os.path.join(res_dir, 'efms.txt'))
 
 
@@ -116,22 +118,18 @@ def step3(model, N, V, efm_id2i, m_id2i):
     return V_m, m_efm_id2i, efm_id2merged_id
 
 
-def fake_step3(V, efm_id2i):
-    return V, efm_id2i, {}
-
-
-def fake_step2(N, V, r_id2i, efm_id2i):
-    return N, V, r_id2i, efm_id2i, {}
-
-
 def step2(N, V, r_id2i, efm_id2i):
     coupled_r_id_groups = get_coupled_reactions(V, r_id2i)
-    N_c, V_c, c_r_id2i, r_id2lr_id = lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i)
+    N_c, V_c, c_r_id2i, r_id2lr_id, lr_id2r_id2c = lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i)
+
     duplicated_r_id_groups = get_reaction_duplicates(N, r_id2i)
-    N_d, V_d, d_r_id2i, r_id2gr_id, r_id2lambda = remove_reaction_duplicates(N_c, V_c, duplicated_r_id_groups, c_r_id2i)
+    N_d, V_d, d_r_id2i, r_id2gr_id, gr_id2r_id2c = remove_reaction_duplicates(N_c, V_c, duplicated_r_id_groups, c_r_id2i)
     duplicated_efm_id_groups = get_efm_duplicates(V_d, efm_id2i)
     V_dd, d_efm_id2i, efm_id2gr_id = remove_efm_duplicates(V_d, duplicated_efm_id_groups, efm_id2i)
-    return N_d, V_dd, d_r_id2i, d_efm_id2i, efm_id2gr_id
+
+    r_id2mr_id = {r_id: r_id2gr_id[lr_id] for (r_id, lr_id) in r_id2lr_id.iteritems() if lr_id in r_id2gr_id}
+    r_id2mr_id.update({r_id: gr_id for (r_id, gr_id) in r_id2gr_id.iteritems() if r_id in r_id2i})
+    return N_d, V_dd, d_r_id2i, d_efm_id2i, efm_id2gr_id, r_id2lr_id, r_id2mr_id, lr_id2r_id2c, gr_id2r_id2c
 
 
 def step1(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id,

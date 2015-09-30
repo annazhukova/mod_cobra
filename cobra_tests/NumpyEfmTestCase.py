@@ -7,7 +7,7 @@ from SBMLTestCase import create_test_sbml, TEST_SBML
 from numpy_efm_manager import get_element2id_mapping, get_stoichiometric_matrix, get_efm_matrix, get_control_efficiency, \
     get_yield, get_coupled_reactions, lump_coupled_reactions, get_reaction_duplicates, remove_reaction_duplicates, \
     get_efm_duplicates, remove_efm_duplicates, get_boundary_metabolites, get_efm_groups_based_on_boundary_metabolites, \
-    merge_efm_groups, get_len, remove_invalid_efms
+    merge_efm_groups, get_len, remove_invalid_efms, get_efm_intersection
 import numpy as np
 
 __author__ = 'anna'
@@ -30,7 +30,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         """
         create_test_sbml()
         self.doc = libsbml.SBMLReader().readSBML(TEST_SBML)
-        self.model =self.doc.getModel()
+        self.model = self.doc.getModel()
         self.s_id2i, self.r_id2i = get_element2id_mapping(self.model)
 
     def tearDown(self):
@@ -104,7 +104,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
-        N_new, V_new, new_r_id2i, r_id2lr_id = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
+        N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
         lr_id = next(r_id2lr_id.itervalues())
         st = N_new[self.s_id2i['m1_b'], new_r_id2i[lr_id]]
         self.assertEqual(-1, st, 'The lumped reaction was supposed to consume 1 m1_b, consumes %g instead' % -st)
@@ -113,7 +113,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
-        N_new, V_new, new_r_id2i, r_id2lr_id = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
+        N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
         lr_id = next(r_id2lr_id.itervalues())
         st = N_new[self.s_id2i['m2_b'], new_r_id2i[lr_id]]
         self.assertEqual(1, st, 'The lumped reaction was supposed to produce 1 m2_b, consumes %g instead' % -st)
@@ -122,12 +122,21 @@ class NumpyEfmTestCase(unittest.TestCase):
         N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
-        N_new, V_new, new_r_id2i, r_id2lr_id = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
+        N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
         lr_id = next(r_id2lr_id.itervalues())
         r_i = V_new[new_r_id2i[lr_id], :]
-        self.assertListEqual([1, 0.1], list(r_i),
-                             'The lumped reaction was supposed to participate in EFMs with coefficients [1, 0.1] not %s'
+        self.assertListEqual([10, 1], list(r_i),
+                             'The lumped reaction was supposed to participate in EFMs with coefficients [10, 1] not %s'
                              % r_i)
+
+    def test_lump_coupled_reactions_NV(self):
+        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
+        NV = np.dot(N, V)
+        coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
+        N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
+        NV_new = np.dot(N_new, V_new)
+        self.assertListEqual(list(NV.flatten()), list(NV_new.flatten()), 'NV should not have changed')
 
     def test_reaction_duplicates_len(self):
         N = np.array([[1, 2, 0, -1],
@@ -171,7 +180,7 @@ class NumpyEfmTestCase(unittest.TestCase):
                       [2, -1]])
         r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
         r_duplicates = get_reaction_duplicates(N, r_id2i)
-        N_new, V_new, new_r_id2i, r_id2gr_id, r_id2lambda = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
+        N_new, V_new, new_r_id2i, r_id2gr_id, _ = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
         m2_st = N[1, new_r_id2i[r_id2gr_id['r1']]]
         self.assertEqual(0, m2_st,
                          'Was supposed to find no metabolite m2 in the grouped reaction, found %g' % m2_st)
@@ -186,7 +195,7 @@ class NumpyEfmTestCase(unittest.TestCase):
                       [2, -1]])
         r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
         r_duplicates = get_reaction_duplicates(N, r_id2i)
-        N_new, V_new, new_r_id2i, r_id2gr_id, r_id2lambda = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
+        N_new, V_new, new_r_id2i, r_id2gr_id, _ = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
         new_r_index = new_r_id2i[r_id2gr_id['r1']]
         m1_st = N[0, new_r_index]
         m3_st = N[2, new_r_index]
@@ -204,7 +213,7 @@ class NumpyEfmTestCase(unittest.TestCase):
                       [2, -1]])
         r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
         r_duplicates = get_reaction_duplicates(N, r_id2i)
-        N_new, V_new, new_r_id2i, r_id2gr_id, r_id2lambda = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
+        N_new, V_new, new_r_id2i, r_id2gr_id, _ = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
         self.assertTupleEqual((2, 2), V_new.shape,
                               'Was supposed to get 2x2 V, got %s' % [str(it) for it in V_new.shape])
 
@@ -218,7 +227,7 @@ class NumpyEfmTestCase(unittest.TestCase):
                       [2, -1]])
         r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
         r_duplicates = get_reaction_duplicates(N, r_id2i)
-        N_new, V_new, new_r_id2i, r_id2gr_id, r_id2lambda = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
+        N_new, V_new, new_r_id2i, r_id2gr_id, _ = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
         new_r_index = new_r_id2i[r_id2gr_id['r1']]
         efm1_c = V_new[new_r_index, 0]
         efm2_c = V_new[new_r_index, 1]
@@ -226,6 +235,21 @@ class NumpyEfmTestCase(unittest.TestCase):
         self.assertEqual(-3, ratio,
                          'Was supposed to get -3 as a ratio between the coefficients of the grouped reaction in EFMs 2 and 1, got %g'
                          % ratio)
+
+    def test_remove_reaction_duplicates_NV(self):
+        N = np.array([[1, 2, 0, -1],
+                      [0, 0, 1, 0],
+                      [-2, -4, -1, 2]])
+        V = np.array([[-1, 0],
+                      [1, 1],
+                      [0, -1],
+                      [2, -1]])
+        r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
+        r_duplicates = get_reaction_duplicates(N, r_id2i)
+        N_new, V_new, new_r_id2i, r_id2gr_id, _ = remove_reaction_duplicates(N, V, r_duplicates, r_id2i)
+        NV = np.dot(N, V)
+        NV_new = np.dot(N_new, V_new)
+        self.assertListEqual(list(NV.flatten()), list(NV_new.flatten()), 'NV was not supposed to change')
 
     def test_efm_duplicates_len(self):
             V = np.array([[1, 2, -1, -1],
@@ -304,6 +328,26 @@ class NumpyEfmTestCase(unittest.TestCase):
                       [0, 10, 0]])
         v_new = remove_invalid_efms(N, V)[:, 0]
         self.assertListEqual(list(V[:,0]), list(v_new), 'EFM 0 was supposed to be valid')
+
+    def test_efm_intersection_size(self):
+        V = np.array([[1, 1, 1],
+                      [1, 0, 0],
+                      [-1, -5, -3],
+                      [0, 10, 0]])
+        r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
+        r_id2direction = get_efm_intersection(V, r_id2i)
+        size = len(r_id2direction)
+        self.assertEqual(2, size, 'Intersection was supposed to have 2 reactions, got %d' % size)
+
+    def test_efm_intersection_content(self):
+        V = np.array([[1, 1, 1],
+                      [1, 0, 0],
+                      [-1, -5, -3],
+                      [0, 10, 0]])
+        r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
+        r_id2direction = get_efm_intersection(V, r_id2i)
+        self.assertDictEqual({'r1': 1, 'r3': -1}, r_id2direction,
+                             'Intersection was supposed to be r1, -r3 reactions, got %s' % str(r_id2direction))
 
     def test_get_efm_groups_based_on_b_ms_size(self):
         """
