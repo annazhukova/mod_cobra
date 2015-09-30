@@ -1,6 +1,4 @@
 from collections import Counter
-import math
-import sys
 from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 
 __author__ = 'anna'
@@ -10,15 +8,6 @@ TYPE_EFM = 0
 TYPE_PATHWAY = 1
 TYPE_FOLDED_EFM = 2
 TYPE_PATTERN = 3
-
-def get_int_size():
-    """
-    Calculates the maximal number of bits in an int:
-    math.log(sys.maxint) / math.log(2).
-
-    :return: int, the maximal number of bits in an int.
-    """
-    return math.log(sys.maxint) / math.log(2)
 
 
 def coeff_to_binary(coeff):

@@ -1,6 +1,6 @@
 from collections import defaultdict
 import logging
-
+from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_EFM
 from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_efficiency, get_fm_yield
 from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.efm.efm_manager import compute_efms
@@ -15,11 +15,12 @@ def get_efms(target_r_id, target_r_reversed, r_id2rev, sbml, directory, max_efm_
              efms=None, rewrite=True, tree_efm_path=TREEEFM_PATH):
     if not efms:
         if tree_efm_path:
-            efms, r_ids, rev_r_ids = compute_efms(sbml, directory, max_efm_number, target_r_id, target_r_reversed,
-                                                  tree_efm_path, r_id2rev, threshold=threshold, rewrite=rewrite)
+            efms = compute_efms(sbml, directory, max_efm_number, target_r_id, target_r_reversed,
+                                tree_efm_path, r_id2rev, threshold=threshold, rewrite=rewrite)
             if not efms:
                 logging.info('Found no EFMs of interest.')
                 return None
+            efms = [EFM(r_id2coeff=r_id2coeff, type=TYPE_EFM) for r_id2coeff in efms]
         else:
             raise ValueError('No EFMs found :(. Probably, you forgot to specify TreeEFM path?')
 

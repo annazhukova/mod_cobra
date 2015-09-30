@@ -2,7 +2,7 @@ import libsbml
 
 from mod_cobra.constraint_based_analysis.efm.control_effective_flux_calculator import get_fm_yield
 from mod_sbml.utils.misc import invert_map
-from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_EFM, TYPE_FOLDED_EFM, TYPE_PATHWAY
+from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_EFM, TYPE_FOLDED_EFM
 from mod_sbml.sbml.submodel_manager import submodel
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 

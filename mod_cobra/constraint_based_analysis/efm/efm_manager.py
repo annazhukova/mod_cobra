@@ -4,14 +4,14 @@ import os
 import libsbml
 
 from mod_cobra.constraint_based_analysis import round_value, ZERO_THRESHOLD
-from mod_cobra.constraint_based_analysis.efm.EFM import get_int_size, EFM, TYPE_EFM
 from mod_cobra.gibbs.reaction_boundary_manager import get_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants
 
 __author__ = 'anna'
 
 
-def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=None, threshold=0.0, rewrite=True):
+def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=None, threshold=ZERO_THRESHOLD,
+                 rewrite=True):
     """
     Computes elementary flux modes (EFMs) in a given SBML (see http://sbml.org) model,
     that contain a reaction of interest
@@ -52,21 +52,21 @@ def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=
     # Filter EFMs so that only those that don't include the reaction in opposite directions are left.
     # If r_id2rev is specified, filter EFMs to leave only those that include these reactions in these directions.
     em_file_filtered = os.path.join(directory, "FV-EM_filtered.dat.txt")
-    efms, all_r_ids, rev_r_ids = filter_efms(efm_file_txt, r_id2i, rev_r_id2i, em_file_filtered, r_id2rev,
-                                             zero_threshold=threshold)
+    efms = filter_efms(efm_file_txt, r_id2i, rev_r_id2i, em_file_filtered, r_id2rev, threshold=threshold)
     logging.info(
         "%d elementary modes corresponding to reactions of interest saved to %s" % (len(efms), em_file_filtered))
-    efms = sorted(efms, key=lambda efm: len(efm))
-    return efms, all_r_ids, rev_r_ids
+    return efms
 
 
-def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_threshold=ZERO_THRESHOLD):
+def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, threshold=ZERO_THRESHOLD):
     i2r_id = {i: (r_id, False) for (r_id, i) in r_id2i.iteritems()}
     i2r_id.update({i: (r_id, True) for (r_id, i) in rev_r_id2i.iteritems()})
-    all_r_ids = sorted(set(r_id2i.iterkeys()) | set(rev_r_id2i.iterkeys()))
-    rev_r_ids = set(rev_r_id2i.iterkeys())
-    efms = set()
+    efms = []
     rejected_bad, rejected_different = 0, 0
+
+    get_key = lambda r_id2coeff: \
+        tuple(sorted(((r_id, 1 if coeff > 0 else -1) for (r_id, coeff) in r_id2coeff.iteritems())))
+    processed = set()
     with open(out_path, 'w+') as out_f:
         with open(in_path, 'r') as in_f:
             for line in in_f:
@@ -75,7 +75,7 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_thres
                 bad_em = False
                 for (v, i) in zip(values, xrange(1, len(values) + 1)):
                     v = round_value(v)
-                    if not v or abs(v) <= zero_threshold:
+                    if not v or abs(v) <= threshold:
                         continue
                     r_id, rev = i2r_id[i]
                     if rev:
@@ -87,8 +87,6 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_thres
                         break
                     r_id2coefficient[r_id] = v
 
-                # The same reaction participates in different directions
-                # => don't want such an EFM
                 if bad_em:
                     rejected_bad += 1
                     continue
@@ -102,15 +100,18 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, zero_thres
                     if bad_em:
                         continue
 
+                key = get_key(r_id2coefficient)
+                if key in processed:
+                    continue
+                processed.add(key)
                 out_f.write(line)
-                efm = EFM(r_id2coeff=r_id2coefficient, type=TYPE_EFM)
-                efms.add(efm)
+                efms.append(r_id2coefficient)
     if rejected_different:
         logging.info('Rejected %d EFMs as not all of the reactions of interest were present in them.'
                      % rejected_different)
     if rejected_bad:
         logging.info('Rejected %d EFMs as they contained reversible reactions in both directions' % rejected_bad)
-    return efms, all_r_ids, rev_r_ids
+    return efms
 
 
 def stoichiometric_matrix(model, path):
