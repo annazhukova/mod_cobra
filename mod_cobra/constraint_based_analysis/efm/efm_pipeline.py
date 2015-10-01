@@ -1,34 +1,25 @@
 import logging
 import os
-import libsbml
 import sys
-import shutil
-from SBMLTestCase import create_test_sbml, TEST_SBML, DATA_DIR
-from System import System, FoldedSystem
-from chebi.chebi_annotator import get_species_to_chebi
-from chebi.chebi_serializer import get_chebi
-from compartment.compartment_manager import separate_boundary_species
-from csv_manager import serialize_model_info
 
+import libsbml
+
+from System import System
+from csv_manager import serialize_model_info
 from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
 from mod_cobra.constraint_based_analysis.efm.efm_analyser import TREEEFM_PATH
 from mod_cobra.constraint_based_analysis.efm.efm_manager import compute_efms
 from mod_cobra.constraint_based_analysis.efm.numpy_efm_manager import get_element2id_mapping, get_stoichiometric_matrix, \
-    get_efm_matrix, get_yield, get_control_efficiency, get_len, get_coupled_reactions, lump_coupled_reactions, \
-    get_reaction_duplicates, remove_reaction_duplicates, get_efm_duplicates, remove_efm_duplicates, \
-    get_efm_groups_based_on_boundary_metabolites, merge_efm_groups, remove_invalid_efms
-from mod_cobra.constraint_based_analysis.efm.numpy_efm_serialization_manager import serialize_efms, serialize_r_cliques
+    get_efm_matrix, get_yield, get_control_efficiency, get_len
+from mod_cobra.constraint_based_analysis.efm.numpy_efm_serialization_manager import serialize_efms, serialize_coupled_reaction_groups, \
+    serialize_n_longest_coupled_reaction_groups, serialize_n_most_efficient_efms
 from models.model_list import MODEL_DIR
-from models.rr.model_rr import RR_SER_PRODUCTION, RR_MODEL_DIR, RR_MODEL, RR_GLN_B, RR_SER_B, RR_GLN_EXCHANGE
 from mod_sbml.utils.path_manager import create_dirs
 from mod_cobra.gibbs.reaction_boundary_manager import get_bounds, set_bounds
 from mod_sbml.sbml.sbml_manager import reverse_reaction, get_reactants, get_products
 from models.serine.serine_sr import SR_SER_PRODUCTION, SR_GLN_B, SR_SER_B, SR_GLN_EXCHANGE
-from models.smith_robinson.model_SmithRobinson import SR_MODEL_SER, SR_MODEL_DIR
+from models.smith_robinson.model_SmithRobinson import SR_MODEL_SER
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, select_metabolite_ids_by_term_ids
-from onto import parse_simple
-from recon.model_recon import RECON_MODEL_BOUNDARIES
-from serine.serine_recon import RECON_SER_PRODUCTION, RECON_GLN_B, RECON_SER_B, RECON_GLN_EXCHANGE
 
 __author__ = 'anna'
 
@@ -67,7 +58,10 @@ def constraint_exchange_reactions(model, allowed_exchange_r_id2rev, cofactors=No
 
 
 def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2rev=None, threshold=ZERO_THRESHOLD,
-                  tree_efm_path=TREEEFM_PATH, max_efm_number=1000, serializers=(serialize_efms, serialize_r_cliques)):
+                  tree_efm_path=TREEEFM_PATH, max_efm_number=1000,
+                  serializers=(serialize_efms, serialize_coupled_reaction_groups,
+                               serialize_n_longest_coupled_reaction_groups,
+                               serialize_n_most_efficient_efms)):
     create_dirs(res_dir, True)
 
     doc = libsbml.SBMLReader().readSBML(sbml)
@@ -89,56 +83,20 @@ def analyse_model_efm(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_
     doc = libsbml.SBMLReader().readSBML(sbml)
     model = doc.getModel()
 
-    # Step 1: compute EFMs
-    S_initial = step1(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id, tree_efm_path, max_efm_number,
-              threshold)
+    system_initial = get_initial_system(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id,
+                                        tree_efm_path, max_efm_number, threshold)
+    system_folded = system_initial.lump_coupled_reactions()
+    system_folded_no_duplicates = system_folded.remove_reaction_duplicates().remove_efm_duplicates()
+    system_merged = system_folded_no_duplicates.merge_efm_groups()
 
-    # # Step 2: lump coupled reactions
-    S_coupled, S_no_duplicates = step2(S_initial)
-
-    # # Step 3: merge pathways based on boundary metabolites
-    S_merged = step3(model, S_no_duplicates)
-
-    if serializers:
-        for serialize in serializers:
-            serialize(model=model, path=res_dir, in_m_id=in_m_id, out_m_id=out_m_id, out_r_id=out_r_id,
-                      S_initial=S_initial, S_coupled=S_coupled, S_no_duplicates=S_no_duplicates, S_merged=S_merged)
+    for serialize in (serializers if serializers else []):
+        serialize(model=model, path=res_dir, in_m_id=in_m_id, out_m_id=out_m_id, out_r_id=out_r_id,
+                  S_initial=system_initial, S_coupled=system_folded, S_no_duplicates=system_folded_no_duplicates,
+                  S_merged=system_merged)
 
 
-def step3(model, S):
-    boundary_m_indices = \
-        [S.m_id2i[m.getId()] for m in model.getListOfSpecies() if m.getBoundaryCondition()]
-    boundary_efm_id_groups = \
-        get_efm_groups_based_on_boundary_metabolites(S.N[boundary_m_indices, :],
-                                                     S.V, S.efm_id2i)
-    # boundary_efm_id_groups = get_efm_groups_based_on_boundary_metabolites(N, V, efm_id2i)
-    V_m, m_efm_id2i, efm_id2merged_id = merge_efm_groups(S.V, boundary_efm_id_groups,
-                                                         S.efm_id2i)
-    S_merged = FoldedSystem(st_matrix=S.st_matrix, V=V_m, efm_id2i=m_efm_id2i,
-                            efm_id2gr_id=efm_id2merged_id, boundary_m_ids=S.boundary_m_ids)
-    return S_merged
-
-
-def step2(S):
-    coupled_r_id_groups = get_coupled_reactions(S.V, S.r_id2i)
-    N_c, V_c, c_r_id2i, r_id2lr_id, lr_id2r_id2c = lump_coupled_reactions(S.N, S.V, coupled_r_id_groups, S.r_id2i)
-    S_coupled = FoldedSystem(N=N_c, V=V_c, m_id2i=S.m_id2i, r_id2i=c_r_id2i, efm_id2i=S.efm_id2i,
-                             r_id2gr_id=r_id2lr_id, gr_id2r_id2c=lr_id2r_id2c, boundary_m_ids=S.boundary_m_ids)
-
-    duplicated_r_id_groups = get_reaction_duplicates(S_coupled.N, S_coupled.r_id2i)
-    N_d, V_d, d_r_id2i, r_id2gr_id, gr_id2r_id2c = \
-        remove_reaction_duplicates(S_coupled.N, S_coupled.V, duplicated_r_id_groups, S_coupled.r_id2i)
-    duplicated_efm_id_groups = get_efm_duplicates(V_d, S_coupled.efm_id2i)
-    V_dd, d_efm_id2i, efm_id2gr_id = remove_efm_duplicates(V_d, duplicated_efm_id_groups, S_coupled.efm_id2i)
-    S_no_duplicates = FoldedSystem(N=N_d, V=V_dd, m_id2i=S_coupled.m_id2i, r_id2i=d_r_id2i, efm_id2i=d_efm_id2i,
-                                   r_id2gr_id=r_id2gr_id, gr_id2r_id2c=gr_id2r_id2c, efm_id2gr_id=efm_id2gr_id,
-                                   boundary_m_ids=S_coupled.boundary_m_ids)
-
-    return S_coupled, S_no_duplicates
-
-
-def step1(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id,
-          tree_efm_path, max_efm_number, threshold):
+def get_initial_system(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id,
+                       tree_efm_path, max_efm_number, threshold):
     m_id2i, r_id2i = get_element2id_mapping(model)
     N = get_stoichiometric_matrix(model, m_id2i, r_id2i)
     logging.info('Calculated N of shape %s' % 'x'.join((str(it) for it in N.shape)))

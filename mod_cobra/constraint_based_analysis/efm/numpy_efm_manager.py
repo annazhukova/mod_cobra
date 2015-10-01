@@ -34,10 +34,6 @@ def remove_invalid_efms(N, V, threshold=ZERO_THRESHOLD):
     # return np.array([v for v in V.T if np.count_nonzero(np.dot(N, v.T)) == 0]).T
 
 
-def get_r_id2coeff(v, r_id2i, threshold=ZERO_THRESHOLD):
-    return {r_id: v[i] for (r_id, i) in r_id2i.iteritems() if abs(v[i]) > threshold}
-
-
 def get_control_efficiency(v, r_index):
     return 1.0 * v[r_index] / sum((abs(c) for c in v))
 
