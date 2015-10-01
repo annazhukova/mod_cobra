@@ -100,7 +100,6 @@ def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
         replace_zeros(r_new)
         N_new = np.concatenate((N_new, r_new), axis=1)
         V_new = np.concatenate((V_new, [V[sample_r_index, :] * sign]), axis=0)
-
     return N_new, V_new, new_r_id2i, r_id2lr_id, lr_id2r_id2c
 
 
