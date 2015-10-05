@@ -1,9 +1,10 @@
 from collections import defaultdict
 import numpy as np
 from scipy.sparse import csr_matrix
+import libsbml
 from constraint_based_analysis import ZERO_THRESHOLD, round_value
 
-from sbml_manager import get_reactants, get_products
+from sbml_manager import get_reactants, get_products, create_compartment, create_species, create_reaction
 
 __author__ = 'anna'
 
@@ -49,7 +50,7 @@ def get_yield(N, v, out_m_index, in_m_index):
     return np.dot(N[out_m_index, :], v) / (-1.0 * in_value)
 
 
-def get_stoichiometric_matrix(model, s_id2i, r_id2i):
+def model2stoichiometric_matrix(model, s_id2i, r_id2i):
     rows, cols, data = [], [], []
     for r in model.getListOfReactions():
         cols.extend([r_id2i[r.getId()]] * (r.getNumReactants() + r.getNumProducts()))
@@ -99,8 +100,8 @@ def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
     return N_new, V_new, new_r_id2i, r_id2lr_id, lr_id2r_id2c
 
 
-def get_reaction_duplicates(N, r_id2i):
-    return get_equivalent_rows(N, r_id2i, axis=1)
+def get_reaction_duplicates(N, r_id2i, m_indices=None):
+    return get_equivalent_rows(N[m_indices, :] if m_indices else N, r_id2i, axis=1)
 
 
 def remove_reaction_duplicates(N, V, r_id_groups, r_id2i):

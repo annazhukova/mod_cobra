@@ -7,7 +7,7 @@ from cobra.flux_analysis.parsimonious import optimize_minimal_flux
 
 from mod_cobra.constraint_based_analysis import round_value
 from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.model_manager import get_transport_reactions, \
-    get_boundary_reactions
+    get_boundary_reactions, format_r_id
 from mod_sbml.serialization.plot_manager import create_plot, save_fig, create_subplot, initialise_fig
 from mod_sbml.serialization.serialization_manager import get_cobra_r_formula, get_sbml_r_formula
 
@@ -211,10 +211,10 @@ def get_fluxes_larger_than_threshold(model, threshold=0):
 
 
 def serialize_fluxes(model, r_id2val, path, objective_sense, out_r_id):
+    out_r_id = format_r_id(out_r_id)
     title = '%s reaction %s (%s): %.4g\n==================================\n'\
-              % (objective_sense, out_r_id, get_sbml_r_formula(model, model.getReaction(out_r_id),
-                                                               show_metabolite_ids=True, show_compartments=False),
-                 r_id2val[out_r_id])
+            % (objective_sense, out_r_id, get_cobra_r_formula(model.reactions.get_by_id(out_r_id), comp=True),
+               r_id2val[out_r_id])
     value2rn = defaultdict(list)
     for r_id, value in r_id2val.iteritems():
         rn = model.reactions.get_by_id(r_id)
@@ -281,9 +281,10 @@ def get_r_id2fva_bounds(model, threshold=None, rs=None):
 
 
 def serialize_fva(model, r_id2bounds, path, objective_sense, out_r_id):
+    out_r_id = format_r_id(out_r_id)
     title = '%s reaction %s (%s): %.4g\n==================================\n'\
-              % (objective_sense, out_r_id, get_sbml_r_formula(model, model.getReaction(out_r_id),
-                                                               show_metabolite_ids=True, show_compartments=False),
+              % (objective_sense, out_r_id, get_cobra_r_formula(model.reactions.get_by_id(out_r_id),
+                                                                comp=True),
                  r_id2bounds[out_r_id][0])
 
     values2r_ids = defaultdict(set)

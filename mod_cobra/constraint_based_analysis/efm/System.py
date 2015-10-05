@@ -8,19 +8,20 @@ __author__ = 'anna'
 
 
 class StoichiometricMatrix(object):
-    def __init__(self, N, m_id2i, r_id2i, boundary_indices):
+    def __init__(self, N, m_id2i, r_id2i, boundary_m_ids):
         self.N = N
         self.m_id2i = m_id2i
         self.r_id2i = r_id2i
-        self.boundary_m_ids = boundary_indices
+        self.boundary_m_ids = boundary_m_ids
 
     def get_inputs_outputs(self, r_id):
         ms = self.N[:, self.r_id2i[r_id]]
-        return {(m_id, -ms[i]) for (m_id, i) in self.m_id2i.iteritems() if ms[i] < 0},\
-               {(m_id, ms[i]) for (m_id, i) in self.m_id2i.iteritems() if ms[i] > 0}
+        return {m_id: -ms[i] for (m_id, i) in self.m_id2i.iteritems() if ms[i] < 0},\
+               {m_id: ms[i] for (m_id, i) in self.m_id2i.iteritems() if ms[i] > 0}
 
-    def get_reaction_duplicates(self):
-        return get_reaction_duplicates(self.N, self.r_id2i)
+    def get_reaction_duplicates(self, ignored_m_ids=None):
+        m_indices = [i for (m_id, i) in self.m_id2i.iteritems() if m_id not in ignored_m_ids] if ignored_m_ids else None
+        return get_reaction_duplicates(self.N, self.r_id2i, m_indices)
 
 
 class PathwaySet(object):
@@ -48,6 +49,9 @@ class PathwaySet(object):
 
     def get_efm_intersection(self):
         return get_efm_intersection(self.V, self.r_id2i)
+
+    def get_efm_ids_by_r_id(self, r_id):
+        return [efm_id for (efm_id, i) in self.efm_id2i.iteritems() if self.V[self.r_id2i[r_id], i]]
 
 
 class System(object):
@@ -95,8 +99,8 @@ class System(object):
         b_ms = get_boundary_metabolites(self.N[[self.m_id2i[m_id] for m_id in self.boundary_m_ids], :], v)
         bm_id2i = dict(zip(self.boundary_m_ids, xrange(0, len(self.boundary_m_ids))))
         # b_ms = get_boundary_metabolites(self.N, v)
-        r_id2st = {(m_id, -b_ms[bm_id2i[m_id]]) for m_id in self.boundary_m_ids if b_ms[bm_id2i[m_id]] < 0}
-        p_id2st = {(m_id, b_ms[bm_id2i[m_id]]) for m_id in self.boundary_m_ids if b_ms[bm_id2i[m_id]] > 0}
+        r_id2st = {m_id: -b_ms[bm_id2i[m_id]] for m_id in self.boundary_m_ids if b_ms[bm_id2i[m_id]] < 0}
+        p_id2st = {m_id: b_ms[bm_id2i[m_id]] for m_id in self.boundary_m_ids if b_ms[bm_id2i[m_id]] > 0}
         return r_id2st, p_id2st
 
     def get_efm_groups_based_on_boundary_metabolites(self):
@@ -110,13 +114,6 @@ class System(object):
         return FoldedSystem(N=N_c, V=V_c, m_id2i=self.m_id2i, r_id2i=c_r_id2i, efm_id2i=self.efm_id2i,
                             r_id2gr_id=r_id2lr_id, gr_id2r_id2c=lr_id2r_id2c, boundary_m_ids=self.boundary_m_ids)
 
-    def remove_reaction_duplicates(self):
-        duplicated_r_id_groups = self.st_matrix.get_reaction_duplicates()
-        N_d, V_d, d_r_id2i, r_id2gr_id, gr_id2r_id2c = \
-            remove_reaction_duplicates(self.N, self.V, duplicated_r_id_groups, self.r_id2i)
-        return FoldedSystem(N=N_d, V=V_d, m_id2i=self.m_id2i, r_id2i=d_r_id2i, efm_id2i=self.efm_id2i,
-                            r_id2gr_id=r_id2gr_id, gr_id2r_id2c=gr_id2r_id2c, boundary_m_ids=self.boundary_m_ids)
-
     def merge_efm_groups(self):
         boundary_efm_id_groups = self.get_efm_groups_based_on_boundary_metabolites()
         V_m, m_efm_id2i, efm_id2merged_id = merge_efm_groups(self.V, boundary_efm_id_groups, self.efm_id2i)
@@ -124,7 +121,7 @@ class System(object):
 
 
 class FoldedSystem(System):
-    def __init__(self, r_id2gr_id=None, gr_id2r_id2c=None, efm_id2gr_id=None, st_matrix=None, pws=None,
+    def __init__(self, r_id2gr_id=None, gr_id2r_id2c=None, efm_id2gr_id=None, m_id2gr_id=None, st_matrix=None, pws=None,
                  N=None, V=None, m_id2i=None, r_id2i=None, efm_id2i=None, boundary_m_ids=None):
         System.__init__(self, st_matrix=st_matrix, pws=pws, N=N, V=V, m_id2i=m_id2i, r_id2i=r_id2i, efm_id2i=efm_id2i,
                         boundary_m_ids=boundary_m_ids)
@@ -132,9 +129,30 @@ class FoldedSystem(System):
         self.gr_id2r_id2c = gr_id2r_id2c
         self.efm_id2gr_id = efm_id2gr_id if efm_id2gr_id else {}
         self.gr_id2efm_ids = invert_map(self.efm_id2gr_id)
+        self.m_id2gr_id = m_id2gr_id
 
     def remove_efm_duplicates(self):
         duplicated_efm_id_groups = self.pws.get_efm_duplicates()
         V_dd, d_efm_id2i, efm_id2gr_id = remove_efm_duplicates(self.V, duplicated_efm_id_groups, self.efm_id2i)
         return FoldedSystem(st_matrix=self.st_matrix, V=V_dd, efm_id2i=d_efm_id2i, efm_id2gr_id=efm_id2gr_id,
-                            r_id2gr_id=self.r_id2gr_id, gr_id2r_id2c=self.gr_id2r_id2c)
+                            r_id2gr_id=self.r_id2gr_id, gr_id2r_id2c=self.gr_id2r_id2c, m_id2gr_id=self.m_id2gr_id)
+
+    def remove_reaction_duplicates(self, ignored_m_ids=None):
+        duplicated_r_id_groups = self.st_matrix.get_reaction_duplicates(ignored_m_ids)
+        N_d, V_d, d_r_id2i, r_id2gr_id, gr_id2r_id2c = \
+            remove_reaction_duplicates(self.N, self.V, duplicated_r_id_groups, self.r_id2i)
+        return FoldedSystem(N=N_d, V=V_d, m_id2i=self.m_id2i, r_id2i=d_r_id2i, efm_id2i=self.efm_id2i,
+                            r_id2gr_id=r_id2gr_id, gr_id2r_id2c=gr_id2r_id2c, boundary_m_ids=self.boundary_m_ids,
+                            m_id2gr_id=self.m_id2gr_id)
+
+    def remove_unused_metabolites(self):
+        m_ids = sorted((m_id for (m_id, i) in self.m_id2i.iteritems() if get_len(self.N[i, :])),
+                       key=lambda m_id: self.m_id2i[m_id])
+        if len(m_ids) == len(self.m_id2i):
+            return self
+        m_id2i = dict(zip(m_ids, xrange(0, len(m_ids))))
+        return FoldedSystem(N=self.N[[self.m_id2i[m_id] for m_id in m_ids], :], pws=self.pws, m_id2i=m_id2i,
+                            r_id2gr_id=self.r_id2gr_id, gr_id2r_id2c=self.gr_id2r_id2c,
+                            boundary_m_ids=sorted(set(self.boundary_m_ids) & set(m_ids)),
+                            m_id2gr_id={m_id: gr_id for (m_id, gr_id) in self.m_id2gr_id.iteritems() if gr_id in m_ids},
+                            efm_id2gr_id=self.efm_id2gr_id)

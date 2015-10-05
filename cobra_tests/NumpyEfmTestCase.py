@@ -4,7 +4,7 @@ import unittest
 import libsbml
 
 from SBMLTestCase import create_test_sbml, TEST_SBML
-from numpy_efm_manager import get_element2id_mapping, get_stoichiometric_matrix, get_efm_matrix, get_control_efficiency, \
+from numpy_efm_manager import get_element2id_mapping, model2stoichiometric_matrix, get_efm_matrix, get_control_efficiency, \
     get_yield, get_coupled_reactions, lump_coupled_reactions, get_reaction_duplicates, remove_reaction_duplicates, \
     get_efm_duplicates, remove_efm_duplicates, get_boundary_metabolites, get_efm_groups_based_on_boundary_metabolites, \
     merge_efm_groups, get_len, remove_invalid_efms, get_efm_intersection
@@ -38,17 +38,17 @@ class NumpyEfmTestCase(unittest.TestCase):
             os.remove(TEST_SBML)
 
     def test_st_matrix_product(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         self.assertEqual(1, N[self.s_id2i['m2'], self.r_id2i['r6']],
                          'N[m2, r6] was supposed to be 1, got %g instead.' % N[self.s_id2i['m2'], self.r_id2i['r6']])
 
     def test_st_matrix_reactant(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         self.assertEqual(-1, N[self.s_id2i['m1'], self.r_id2i['r2']],
                          'N[m1, r2] was supposed to be -1, got %g instead.' % N[self.s_id2i['m2'], self.r_id2i['r6']])
 
     def test_st_matrix_unrelated_metabolite(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         self.assertEqual(0, N[self.s_id2i['m2'], self.r_id2i['r1']],
                          'N[m2, r1] was supposed to be -1, got %g instead.' % N[self.s_id2i['m2'], self.r_id2i['r6']])
 
@@ -69,21 +69,21 @@ class NumpyEfmTestCase(unittest.TestCase):
                          'Control efficiency of r3 in EFM 0 was supposed to be 1/3, got %g instead.' % ce)
 
     def test_yield(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 10, 'r3': 10, 'r4': 10, 'r6': 10}], self.r_id2i)
         y = get_yield(N, V[:, 0], out_m_index=self.s_id2i['m2_b'], in_m_index=self.s_id2i['m1_b'])
         self.assertEqual(1, y,
                          'Yield of m2_b with respect to m1_b in EFM 0 was supposed to be 1, got %g instead.' % y)
 
     def test_yield_no_in_metabolite(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 10, 'r3': 10, 'r4': 10, 'r6': 10}], self.r_id2i)
         y = get_yield(N, V[:, 0], out_m_index=self.s_id2i['m2_b'], in_m_index=self.s_id2i['m3_b'])
         self.assertEqual(float('inf'), y,
                          'Yield of m2_b with respect to m3_b in EFM 0 was supposed to be inf, got %g instead.' % y)
 
     def test_yield_no_out_metabolite(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 10, 'r3': 10, 'r4': 10, 'r6': 10}], self.r_id2i)
         y = get_yield(N, V[:, 0], out_m_index=self.s_id2i['m3_b'], in_m_index=self.s_id2i['m1_b'])
         self.assertEqual(0, y,
@@ -101,7 +101,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         self.assertIn(['r1', 'r3'], coupled_r_id_groups, 'Was supposed to find [r1, r3] coupled reaction group.')
 
     def test_lump_coupled_reactions_N_1(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
         N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
@@ -110,7 +110,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         self.assertEqual(-1, st, 'The lumped reaction was supposed to consume 1 m1_b, consumes %g instead' % -st)
 
     def test_lump_coupled_reactions_N_2(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
         N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
@@ -119,7 +119,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         self.assertEqual(1, st, 'The lumped reaction was supposed to produce 1 m2_b, consumes %g instead' % -st)
 
     def test_lump_coupled_reactions_V(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
         N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
@@ -130,7 +130,7 @@ class NumpyEfmTestCase(unittest.TestCase):
                              % r_i)
 
     def test_lump_coupled_reactions_NV(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         NV = np.dot(N, V)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
@@ -295,7 +295,7 @@ class NumpyEfmTestCase(unittest.TestCase):
                          % ratio)
 
     def test_boundary_metabolites(self):
-        N = get_stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
+        N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 10, 'r3': 10, 'r4': 10, 'r6': 10}], self.r_id2i)
         m = get_boundary_metabolites(N, V[:, 0])
         result = {(m[self.s_id2i[m_id]], m_id) for m_id in self.s_id2i.iterkeys() if m[self.s_id2i[m_id]]}
