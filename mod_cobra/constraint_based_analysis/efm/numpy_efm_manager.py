@@ -81,8 +81,9 @@ def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
     V_new = V[indices, :]
     r_id2lr_id = {}
     lr_id2r_id2c = {}
+    lr_i = 0
     for r_ids, i in zip(coupled_r_id_groups, xrange(len(ordered_r_ids), len(ordered_r_ids) + len(coupled_r_id_groups))):
-        lumped_r_id = 'lr_%d' % i
+        lumped_r_id, lr_i = get_unique_id(new_r_id2i, 'r_group', lr_i)
         r_id2lr_id.update({r_id: lumped_r_id for r_id in r_ids})
         new_r_id2i[lumped_r_id] = i
 
@@ -113,8 +114,9 @@ def remove_reaction_duplicates(N, V, r_id_groups, r_id2i):
     N_new = N[:, indices]
     V_new = V[indices, :]
     gr_id2r_id2c = {}
+    gr_i = 0
     for r_ids, i in zip(r_id_groups, xrange(len(ordered_r_ids), len(ordered_r_ids) + len(r_id_groups))):
-        grouped_r_id = 'gr_%d' % i
+        grouped_r_id, gr_i = get_unique_id(new_r_id2i, 'r_type', gr_i)
         r_id2gr_id.update({r_id: grouped_r_id for r_id in r_ids})
         new_r_id2i[grouped_r_id] = i
 
@@ -144,15 +146,24 @@ def remove_efm_duplicates(V, efm_id_groups, efm_id2i):
     new_efm_id2i = dict(zip(ordered_efm_ids, xrange(0, len(ordered_efm_ids))))
     indices = tuple((efm_id2i[efm_id] for efm_id in ordered_efm_ids))
     V_new = V[:, indices]
-    grouped_efm_id = max(efm_id2i.iterkeys())
+    gr_i = 0
     for efm_ids, i in zip(efm_id_groups, xrange(len(ordered_efm_ids), len(ordered_efm_ids) + len(efm_id_groups))):
-        grouped_efm_id += 1
+        grouped_efm_id, gr_i = get_unique_id(new_efm_id2i, 'folded_efm', gr_i)
+
         efm_id2gr_id.update({efm_id: grouped_efm_id for efm_id in efm_ids})
         new_efm_id2i[grouped_efm_id] = i
 
         sample_efm_index = efm_id2i[efm_ids[0]]
         V_new = np.concatenate((V_new, V[:, (sample_efm_index, )]), axis=1)
     return V_new, new_efm_id2i, efm_id2gr_id
+
+
+def get_unique_id(efm_id2i, prefix, i):
+    efm_id = '%s_%d' % (prefix, i)
+    while efm_id in efm_id2i:
+        i += 1
+        efm_id = '%s_%d' % (prefix, i)
+    return efm_id, i
 
 
 def get_boundary_metabolites(N, v):
@@ -189,9 +200,9 @@ def merge_efm_groups(V, efm_id_groups, efm_id2i):
     new_efm_id2i = dict(zip(ordered_efm_ids, xrange(0, len(ordered_efm_ids))))
     indices = tuple((efm_id2i[efm_id] for efm_id in ordered_efm_ids))
     V_new = V[:, indices]
-    grouped_efm_id = max(efm_id2i.iterkeys())
+    gr_i = 0
     for efm_ids, i in zip(efm_id_groups, xrange(len(ordered_efm_ids), len(ordered_efm_ids) + len(efm_id_groups))):
-        grouped_efm_id += 1
+        grouped_efm_id, gr_i = get_unique_id(new_efm_id2i, 'pathway', gr_i)
         efm_id2gr_id.update({efm_id: grouped_efm_id for efm_id in efm_ids})
         new_efm_id2i[grouped_efm_id] = i
 

@@ -41,7 +41,8 @@ def get_initial_system(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_
         if out_m_id and in_m_id and out_m_id in m_id2i and in_m_id in m_id2i else None
     i2efficiency = {i: (v_yield(i), -get_control_efficiency(V[:, i], r_id2i[out_r_id]), get_len(V[:, i]))
                     for i in xrange(0, V.shape[1])}
-    efm_id2i = dict(zip(xrange(0, len(i2efficiency)), sorted(i2efficiency.iterkeys(), key=lambda i: i2efficiency[i])))
+    efm_id2i = dict(zip(('efm_%d' % it for it in xrange(0, len(i2efficiency))),
+                        sorted(i2efficiency.iterkeys(), key=lambda i: i2efficiency[i])))
     return System(N=N, V=V, m_id2i=m_id2i, r_id2i=r_id2i, efm_id2i=efm_id2i,
                   boundary_m_ids=[m.getId() for m in model.getListOfSpecies() if m.getBoundaryCondition()])
 

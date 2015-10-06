@@ -1,3 +1,6 @@
+from misc import invert_map
+from serialization_manager import get_sbml_r_formula
+
 __author__ = 'anna'
 
 THICK_DELIMITER = '==============================================================\n\n'
@@ -45,6 +48,16 @@ def r_id2c_to_string(r_id2c, binary=False, get_key=lambda r_id: (0, (None, 0), (
         result.append(')')
 
     return ''.join(result)
+
+
+def write_detailed_r_id2c(model, r_id2c, f):
+    c2r_ids = invert_map(r_id2c)
+    for c, r_ids in sorted(c2r_ids.iteritems(), key=lambda (c, _): (-abs(c), -c)):
+        for r_id in sorted(r_ids):
+            f.write('%g\t%s:\t%s\n'
+                    % (c, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False,
+                                                   show_metabolite_ids=True)))
+        f.write('\n')
 
 
 def write_metabolites(m_id2st, model, f, prefix=''):

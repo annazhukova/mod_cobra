@@ -1,11 +1,8 @@
 import os
+
 from html_descriptor import describe
-
-from misc import invert_map
 from mod_cobra.constraint_based_analysis.efm.serialization import r_id2c_to_string, write_inputs_outputs, THIN_DELIMITER, \
-    THICK_DELIMITER, TINY_DELIMITER
-from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
-
+    THICK_DELIMITER, TINY_DELIMITER, write_detailed_r_id2c
 
 __author__ = 'anna'
 
@@ -25,21 +22,15 @@ def serialize_n_most_efficient_efms(model, path, **kwargs):
 
 
 def serialize_efm(S, efm_id, in_m_id, out_m_id, out_r_id, model, path):
-    efm_txt = os.path.join(path, 'EFM_%d.txt' % efm_id)
+    efm_txt = os.path.join(path, '%s.txt' % efm_id)
     with open(efm_txt, 'w+') as f:
         r_id2c = S.pws.get_r_id2coeff(efm_id)
-        f.write('EFM %d of length %d, of yield %g, of efficiency %g\n\n'
+        f.write('EFM %s of length %d, of yield %g, of efficiency %g\n\n'
                 % (efm_id, len(r_id2c), S.get_yield(efm_id, in_m_id, out_m_id),
                    S.pws.get_control_efficiency(efm_id, out_r_id)))
         write_inputs_outputs(f, model, S.get_boundary_inputs_outputs(efm_id))
         f.write(THIN_DELIMITER)
-        c2r_id = invert_map(r_id2c)
-        for c, r_ids in sorted(c2r_id.iteritems(), key=lambda (coeff, _): (-abs(coeff), -coeff)):
-            for r_id in sorted(r_ids):
-                f.write('%g\t%s:\t%s\n' %
-                        (c, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False,
-                                                     show_metabolite_ids=True)))
-            f.write('\n')
+        write_detailed_r_id2c(model, r_id2c, f)
     return efm_txt
 
 
@@ -101,7 +92,7 @@ def write_pathway(model, pathway_id, S, S_folded, S_merged, out_m_id, in_m_id, o
         write_folded_efm(f_efm_id=pathway_id, S=S, S_folded=S_folded, out_r_id=out_r_id, get_key=get_key, f=f)
         return
 
-    f.write('Pathway %s of length %d:\n\n\t%s\n\n'
+    f.write('%s of length %d:\n\n\t%s\n\n'
             % (pathway_id, S_merged.pws.get_len(pathway_id),
                r_id2c_to_string(S_merged.pws.get_r_id2coeff(pathway_id), get_key=get_key)))
     folded_efm_ids = S_merged.gr_id2efm_ids[pathway_id]
@@ -121,7 +112,7 @@ def write_folded_efm(f_efm_id, S, S_folded, out_r_id, get_key, f, tab=''):
         write_efm(efm_id=f_efm_id, S=S, out_r_id=out_r_id, get_key=get_key, f=f, tab=tab)
         return
 
-    f.write('%sFolded EFM %s of length %d:\n\n%s\t%s\n\n'
+    f.write('%s%s of length %d:\n\n%s\t%s\n\n'
             % (tab, f_efm_id, S_folded.pws.get_len(f_efm_id), tab,
                r_id2c_to_string(S_folded.pws.get_r_id2coeff(f_efm_id), get_key=get_key)))
 
@@ -139,7 +130,7 @@ def write_folded_efm(f_efm_id, S, S_folded, out_r_id, get_key, f, tab=''):
 
 
 def write_efm(efm_id, S, out_r_id, get_key, f, tab='', no_first_tab=False):
-    f.write('%sEFM %s of length %d of efficiency %g:\n\n%s\t%s\n\n'
+    f.write('%s%s of length %d of efficiency %g:\n\n%s\t%s\n\n'
             % ('' if no_first_tab else tab, efm_id, S.pws.get_len(efm_id),
                S.pws.get_control_efficiency(efm_id, out_r_id), tab,
                r_id2c_to_string(S.pws.get_r_id2coeff(efm_id), get_key=get_key)))
@@ -150,7 +141,7 @@ def serialize(model, path, get_f_path, **kwargs):
     limit, efm_data = serialize_n_most_efficient_efms(model, path, n=3, **kwargs)
     fm_block = describe('fm_block.html', element_num=limit, characteristics='most effective',
                         element_name='EFM',
-                        fms=[('EFM', efm_id, efm_len, '', get_f_path(efm_txt))
-                             for (efm_id, efm_len, efm_txt) in efm_data])
+                        fms=[(efm_id, efm_len, get_f_path(efm_txt)) for (efm_id, efm_len, efm_txt) in efm_data],
+                        all=limit == efm_num)
     return describe('efms.html', efm_num=efm_num, fm_num=pw_num, description_filepath=get_f_path(pathways_txt),
                     selected_efm_block=fm_block)

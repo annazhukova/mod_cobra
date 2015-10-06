@@ -1,11 +1,8 @@
 import os
+
 from mod_cobra.constraint_based_analysis.html_descriptor import describe
-
-from mod_sbml.utils.misc import invert_map
 from mod_cobra.constraint_based_analysis.efm.serialization import THIN_DELIMITER, THICK_DELIMITER, write_inputs_outputs, \
-    r_id2c_to_string
-from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
-
+    r_id2c_to_string, write_detailed_r_id2c
 
 __author__ = 'anna'
 
@@ -93,13 +90,7 @@ def serialize_coupled_reaction_group(cl_id, S, model, path):
         f.write('Reaction group %s of length %d found in %d EFMs:\n\n\t%s\n\n'
                 % (cl_id, len(r_id2c), len(efm_ids), ', '.join((str(efm_id) for efm_id in efm_ids))))
         f.write(THIN_DELIMITER)
-        c2r_id = invert_map(r_id2c)
-        for c, r_ids in sorted(c2r_id.iteritems(), key=lambda (c, _): (-abs(c), -c)):
-            for r_id in sorted(r_ids):
-                f.write('%g\t%s:\t%s\n'
-                        % (c, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False,
-                                                       show_metabolite_ids=True)))
-            f.write('\n')
+        write_detailed_r_id2c(model, r_id2c, f)
     return rg_txt
 
 
@@ -108,8 +99,8 @@ def serialize(model, path, get_f_path, **kwargs):
     limit, rg_data = serialize_n_longest_coupled_reaction_groups(model, path, n=5, **kwargs)
     fm_block = describe('fm_block.html', element_num=limit, characteristics='longest',
                         element_name='reaction group',
-                        fms=[('Reaction group', rg_id, rg_len, '', get_f_path(rg_txt))
-                             for (rg_id, rg_len, rg_txt) in rg_data])
+                        fms=[(rg_id, rg_len, get_f_path(rg_txt)) for (rg_id, rg_len, rg_txt) in rg_data],
+                        all=limit == rg_num)
     return describe('cliques.html', clique_num=rg_num, description_filepath=get_f_path(rgroups_txt),
                     selected_clique_block=fm_block, type_num=type_num)
 

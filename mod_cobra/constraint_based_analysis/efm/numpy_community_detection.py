@@ -4,8 +4,6 @@ import logging
 from igraph import Graph
 from louvain import find_partition
 
-from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_PATTERN
-
 __author__ = 'anna'
 
 
@@ -26,7 +24,8 @@ def detect_fm_communities(S, threshold):
 
     partition = find_partition(graph=g, method='Modularity', weight='weight')
     i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.iteritems()}
-    return dict(zip(xrange(0, len(partition)), ([i2efm_id[i] for i in cluster] for cluster in partition)))
+    return dict(zip(('pc_%d' % it for it in xrange(0, len(partition))),
+                    ([i2efm_id[i] for i in cluster] for cluster in partition)))
 
 
 def detect_reaction_community(S, efm_ids, threshold_percent, selected_fm):

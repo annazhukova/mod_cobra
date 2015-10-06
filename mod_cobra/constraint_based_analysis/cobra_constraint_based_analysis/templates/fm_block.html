@@ -2,8 +2,8 @@
     <p>{{element_num}} {{characteristics}} {{element_name}}{% if 1 != element_num %}s are{% else %} is{% endif %}:</p>
 {% endif %}
 <ol class="small">
-    {% for (name, fm_id, fm_len, text, fm_txt) in fms %}
-    <li  class="small">{{name}} {{fm_id}} of length <b>{{fm_len}}</b> {{text}}
+    {% for (fm_id, fm_len, fm_txt) in fms %}
+    <li  class="small">{{fm_id}} of length <b>{{fm_len}}</b>
            (<a href="{{fm_txt}}" target="_blank">detailed description</a>);</li>
     {% endfor %}
 </ol>

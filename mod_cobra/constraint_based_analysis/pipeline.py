@@ -33,8 +33,7 @@ from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
 from model_comparison.model_merger import simple_merge_models
 from mod_cobra.constraint_based_analysis.efm.serialization import numpy_efm_serializer, \
-    numpy_coupled_reaction_group_serializer
-from mod_cobra.constraint_based_analysis.efm.serialization.numpy_community_serializer import serialize_communities
+    numpy_coupled_reaction_group_serializer, numpy_community_serializer
 
 CHEBI_H = 'chebi:15378'
 
@@ -265,6 +264,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         vis_r_ids = model_id2vis_r_ids[model_id]
         id2mask = model_id2id2mask[model_id]
         id2color = None
+        info = ''
         S = model_id2S[model_id]
         title = 'Model analysis'
 
@@ -277,29 +277,25 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
     id2imp_rns = {cl_id: detect_reaction_community(S, cluster, imp_fraction, id2intersection[cl_id])
                   for (cl_id, cluster) in id2cluster.iteritems()}
     if id2cluster:
-        comm_txt = os.path.join(comm_dir, 'communities.txt')
-        serialize_communities(S, id2cluster, id2intersection, id2imp_rns, comm_txt)
-        # limit = len(id2cluster)
-    #     mask_shift, fms \
-    #         = process_n_fms(directory=comm_dir, id2fm=id2imp_rns, id2mask=r_id2mask,
-    #                         layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
-    #                         name='community', sorter=lambda (cl_id, cl): cl_id,
-    #                         serializer=lambda cl_id, community_txt:
-    #                         serialize_community(cl_id, id2intersection[cl_id], id2imp_rns[cl_id],
-    #                                             id2cluster[cl_id], model, community_txt),
-    #                         suffix=lambda _: '', limit=limit, get_f_path=get_f_path)
-    #     fm_block = describe('fm_block.html', element_num=limit, characteristics='(all)',
-    #                         element_name='community', fms=fms, all=True)
-    # description += describe('communities.html', community_num=len(id2cluster),
-    #                         description_filepath=get_f_path(comm_txt) if id2cluster else None,
-    #                         selected_community_block=fm_block)
+        doc = libsbml.SBMLReader().readSBML(sbml)
+        model = doc.getModel()
+        description = \
+            numpy_community_serializer.serialize(model, S, id2cluster, id2intersection, id2imp_rns, comm_dir, get_f_path)
+        if len(model_id2sbml) > 1:
+            tab2html['Model comparison'] = tab2html['Model comparison'][0] + description, None
+        else:
+            tab2html['Pathway communities'] = description, None
+        for cl_id, r_id2c in id2imp_rns.iteritems():
+            mask_shift = update_vis_layers(r_id2c, 'Pathway community %s' % cl_id, id2mask, layer2mask, mask_shift,
+                                           vis_r_ids)
 
-    visualize_model(sbml, vis_r_ids, id2mask, id2color, title, '', invisible_layers, layer2mask, res_dir, tab2html)
+    visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html)
 
 
 def get_colors(common_ids, model_id2id2id, model_id2sbml):
     colors = get_n_colors(len(model_id2sbml) + 1, 0.5, 0.8)
     mixed_color = None
+    info = ''
     if common_ids:
         mixed_color = colors[0]
         r, g, b = mixed_color
