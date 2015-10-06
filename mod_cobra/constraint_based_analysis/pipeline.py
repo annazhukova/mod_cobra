@@ -236,7 +236,6 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
     invisible_layers = []
     model_id2id2mask = {}
     model_id2vis_r_ids = {}
-    sbml2name = {}
     model_id2sbml = {}
     model_id2S = {}
     for model_id, (out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id, name) in sbml2parameters.iteritems():
@@ -251,7 +250,6 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         invisible_layers.extend(['%s: %s' % (name, layer) for layer in cur_layer2mask.iterkeys() if layer != main_layer])
         model_id2id2mask[name] = cur_id2mask
         model_id2vis_r_ids[name] = r_ids
-        sbml2name[sub_sbml] = name
         model_id2sbml[name] = sub_sbml
         model_id2S[name] = S
 
@@ -259,11 +257,10 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         mm_dir = os.path.join(res_dir, 'merged_model')
         create_dirs(mm_dir)
 
-        model_id2chebi_id2m_ids, model_id2c_id2data, model_id2m_id2data, model_id2r_id2data = \
-            get_model_data(model_id2sbml)
+        model_id2chebi_id2m_ids, model_id2dfs = get_model_data(model_id2sbml)
 
         model_id2c_id_groups, model_id2m_id_groups, model_id2c_id2i = \
-            map_metabolites_compartments(model_id2chebi_id2m_ids, model_id2c_id2data, model_id2m_id2data)
+            map_metabolites_compartments(model_id2chebi_id2m_ids, model_id2dfs)
         model_id2r_id_groups = []
         ignore_m_ids = set()
         for model_id in model_id2S.iterkeys():
@@ -281,7 +278,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         if model_id2c_id_groups or model_id2m_id_groups:
             comparison_prefix = os.path.join(mm_dir, 'Model_comparison_')
             comp_csv, m_csv, r_csv = \
-                serialize_common_metabolites_compartments_to_csv(model_id2sbml, model_id2c_id_groups,
+                serialize_common_metabolites_compartments_to_csv(model_id2dfs, model_id2c_id_groups,
                                                                  model_id2m_id_groups, model_id2r_id_groups,
                                                                  comparison_prefix)
         else:
@@ -294,9 +291,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         title = 'Combined model analysis'
 
         merged_sbml = os.path.join(res_dir, 'Merged_model.xml')
-        model_id2id2id, common_ids = \
-            simple_merge_models(S_merged, model_id2c_id2i, model_id2c_id2data, model_id2m_id2data, model_id2r_id2data,
-                                merged_sbml)
+        model_id2id2id, common_ids = simple_merge_models(S_merged, model_id2c_id2i, model_id2dfs, merged_sbml)
 
         id2mask = defaultdict(lambda: 0)
         vis_r_ids = set()
@@ -342,50 +337,6 @@ def visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_l
     process_sbml(combined_sbml, verbose=True, path='visualization', generalize=False,
                  id2mask=id2mask, layer2mask=layer2mask, tab2html=tab2html, title=title,
                  id2color=id2color, tabs=None, info=info, invisible_layers=invisible_layers)
-
-
-def join_models(model_id2sbml, get_f_path, res_dir, sbml2id2mask, sbml2name, sbml2vis_r_ids, sbml_files, tab2html):
-    # merged_sbml = os.path.join(res_dir, 'Merged_model.xml')
-
-    model_id2c_id_groups, model_id2m_id_groups = map_metabolites_compartments(model_id2sbml)
-
-
-    # sbml2id2id, sbml2rev_r_ids, common_ids = merge_models(sbml_files, merged_sbml, sbml2name)
-
-    if model_id2c_id_groups or model_id2m_id_groups:
-        comparison_prefix = os.path.join(res_dir, 'Model_comparison_')
-        (cc_num, cm_num), (comp_csv, m_csv) = \
-            serialize_common_metabolites_compartments_to_csv(model_id2sbml,
-                                                             model_id2c_id_groups, model_id2m_id_groups,
-                                                             comparison_prefix)
-    else:
-        cc_num, cm_num = 0, 0
-    tab2html['Model comparison'] = \
-        describe('model_comparison.html', c_num=cc_num, m_num=cm_num, r_num=0,
-                 c_csv=get_f_path(comp_csv) if cc_num else None,
-                 m_csv=get_f_path(m_csv) if cm_num else None,
-                 r_csv=None), None
-    # id2mask = defaultdict(lambda: 0)
-    # vis_r_ids = set()
-    # for sbml in sbml_files:
-    #     id2mask.update({sbml2id2id[sbml][s_id]: id2mask[sbml2id2id[sbml][s_id]] | mask
-    #                     for (s_id, mask) in sbml2id2mask[sbml].iteritems() if s_id in sbml2id2id[sbml]})
-    #     vis_r_ids |= {sbml2id2id[sbml][r_id] for r_id in sbml2vis_r_ids[sbml] if r_id in sbml2id2id[sbml]}
-    #
-    # colors = get_n_colors(len(sbml_files) + 1, 0.5, 0.8)
-    # info = ''
-    # if common_ids:
-    #     mixed_color = colors[0]
-    #     r, g, b = mixed_color
-    #     info = describe('color.html', r=r, g=g, b=b, name='common reactions/metabolites')
-    # sbml2color = dict(zip(sbml2id2id.iterkeys(), colors[1:]))
-    # id2color = {}
-    # for sbml, id2id in sbml2id2id.iteritems():
-    #     color = sbml2color[sbml]
-    #     r, g, b = color
-    #     id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.itervalues()})
-    #     info += describe('color.html', r=r, g=g, b=b, name=sbml2name[sbml])
-    # return id2color, id2mask, info, merged_sbml, vis_r_ids
 
 
 def update_vis_layers(r_id2val, layer, id2mask, layer2mask, mask_shift, vis_r_ids):
