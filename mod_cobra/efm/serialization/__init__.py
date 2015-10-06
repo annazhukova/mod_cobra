@@ -1,5 +1,5 @@
-from misc import invert_map
-from serialization_manager import get_sbml_r_formula
+from mod_sbml.utils.misc import invert_map
+from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 
 __author__ = 'anna'
 

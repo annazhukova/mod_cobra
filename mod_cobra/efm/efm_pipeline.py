@@ -2,18 +2,17 @@ import logging
 
 import libsbml
 
-from mod_cobra.constraint_based_analysis.efm.System import System
-from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
-from mod_cobra.constraint_based_analysis.efm.efm_analyser import TREEEFM_PATH
-from mod_cobra.constraint_based_analysis.efm.efm_manager import compute_efms
-from mod_cobra.constraint_based_analysis.efm.numpy_efm_manager import get_element2id_mapping, model2stoichiometric_matrix, \
+from mod_cobra.efm.System import System
+from mod_cobra import ZERO_THRESHOLD
+from mod_cobra.efm.tree_efm_manager import compute_efms
+from mod_cobra.efm.numpy_efm_manager import get_element2id_mapping, model2stoichiometric_matrix, \
     get_efm_matrix, get_yield, get_control_efficiency, get_len
 
 __author__ = 'anna'
 
 
-def analyse_model_efm(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2rev=None, threshold=ZERO_THRESHOLD,
-                      tree_efm_path=TREEEFM_PATH, max_efm_number=1000):
+def analyse_model_efm(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2rev, tree_efm_path,
+                      threshold=ZERO_THRESHOLD, max_efm_number=1000):
     doc = libsbml.SBMLReader().readSBML(sbml)
     model = doc.getModel()
 
@@ -45,4 +44,3 @@ def get_initial_system(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_
                         sorted(i2efficiency.iterkeys(), key=lambda i: i2efficiency[i])))
     return System(N=N, V=V, m_id2i=m_id2i, r_id2i=r_id2i, efm_id2i=efm_id2i,
                   boundary_m_ids=[m.getId() for m in model.getListOfSpecies() if m.getBoundaryCondition()])
-

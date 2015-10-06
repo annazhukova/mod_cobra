@@ -4,7 +4,7 @@ import unittest
 
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 
-from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fva_analyser import analyse_by_fva
+from fbva import analyse_by_fva
 from cobra_tests.SBMLTestCase import DATA_DIR, TEST_SBML, create_test_sbml
 from mod_sbml.utils.path_manager import create_dirs
 

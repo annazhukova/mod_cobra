@@ -1,7 +1,7 @@
 import os
 
-from mod_cobra.constraint_based_analysis.html_descriptor import describe
-from mod_cobra.constraint_based_analysis.efm.serialization import THIN_DELIMITER, THICK_DELIMITER, write_inputs_outputs, \
+from mod_cobra.html import describe
+from mod_cobra.efm.serialization import THIN_DELIMITER, THICK_DELIMITER, write_inputs_outputs, \
     r_id2c_to_string, write_detailed_r_id2c
 
 __author__ = 'anna'

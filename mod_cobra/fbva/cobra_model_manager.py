@@ -54,10 +54,3 @@ def get_boundary_reactions(model):
             result.add(r.id)
     return result
 
-
-def format_r_id(r_id, remove_prefix=True):
-    if remove_prefix and r_id.startswith('R_'):
-        r_id = r_id[2:]
-    if not remove_prefix and not r_id.startswith('R_'):
-        return 'R_' + r_id
-    return r_id

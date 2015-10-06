@@ -1,10 +1,9 @@
 from collections import defaultdict
 import numpy as np
 from scipy.sparse import csr_matrix
-import libsbml
-from constraint_based_analysis import ZERO_THRESHOLD, round_value
 
-from sbml_manager import get_reactants, get_products, create_compartment, create_species, create_reaction
+from mod_cobra import ZERO_THRESHOLD, round_value
+from mod_sbml.sbml.sbml_manager import get_reactants, get_products
 
 __author__ = 'anna'
 

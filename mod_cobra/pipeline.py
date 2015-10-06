@@ -6,36 +6,34 @@ import shutil
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
 
-from mod_cobra.constraint_based_analysis.efm.numpy_community_detection import detect_fm_communities, detect_reaction_community
-from metabolite_matcher import map_metabolites_compartments, get_model_data
-from mod_cobra.constraint_based_analysis.efm.efm_pipeline import analyse_model_efm
-from mod_cobra.constraint_based_analysis.html_descriptor import describe
+from model_comparison.metabolite_matcher import map_metabolites_compartments, get_model_data
+from model_comparison.model_merge_manager import join, merge
+from model_comparison.model_merger import simple_merge_models
+
+from mod_cobra.efm.community_detector import detect_fm_communities, detect_reaction_community
+from mod_cobra.efm.efm_pipeline import analyse_model_efm
+from mod_cobra.html import describe
 from mod_sbml.serialization.csv_manager import serialize_model_info, \
     serialize_common_metabolites_compartments_to_csv
-from mod_cobra.constraint_based_analysis.efm.sbml.copled_reaction_sbml_manager import create_folded_sbml
-from model_merge_manager import join, merge
+from mod_cobra.efm.serialization.coupled_reaction_sbml_manager import create_folded_sbml
 from sbml_vis.graph.color.color import get_n_colors
-from mod_cobra.constraint_based_analysis import ZERO_THRESHOLD
-from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_manager import serialize_fva, \
-    serialize_fluxes
-from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.model_manager import format_r_id
-from mod_cobra.constraint_based_analysis.efm.efm_serialization_manager import r_ids2sbml
-from mod_cobra.gibbs.reaction_boundary_manager import get_bounds, set_bounds
+from mod_cobra import ZERO_THRESHOLD
+from mod_cobra.fbva.serialization.fbva_serializer import serialize_fva, serialize_fluxes
+from mod_cobra.fbva.serialization import format_r_id
+from mod_cobra.sbml import r_ids2sbml
+from mod_sbml.sbml.reaction_boundary_manager import get_bounds, set_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants, reverse_reaction, get_r_comps
 from mimoza_pipeline import process_sbml
-from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fba_analyser import analyse_by_fba
-from mod_cobra.constraint_based_analysis.cobra_constraint_based_analysis.fva_analyser import analyse_by_fva, \
-    create_fva_model
-from mod_cobra.constraint_based_analysis.efm.efm_analyser import TREEEFM_PATH
+from mod_cobra.fbva.fbva_analyser import analyse_by_fba, analyse_by_fva
+from mod_cobra.fbva.serialization.fbva_sbml_manager import create_fva_model
 from mod_sbml.utils.path_manager import create_dirs
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
-from model_comparison.model_merger import simple_merge_models
-from mod_cobra.constraint_based_analysis.efm.serialization import numpy_efm_serializer, \
-    numpy_coupled_reaction_group_serializer, numpy_community_serializer
+from mod_cobra.efm.serialization import coupled_reaction_group_serializer, community_serializer, efm_serializer
 
 CHEBI_H = 'chebi:15378'
+TREEEFM_PATH = "/home/anna/Applications/TreeEFM/tool/TreeEFMseq"
 
 __author__ = 'anna'
 
@@ -162,12 +160,12 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
     if do_efm:
         cur_dir = _prepare_dir(res_dir, 'efma', "Performing EFMA...")
         S_initial, S_folded, S_folded_wo_duplicates, S_merged = \
-            analyse_model_efm(sbml, out_r_id, out_rev, cur_dir, in_m_id, out_m_id, in_r_id2rev,
-                              threshold, tree_efm_path, max_efm_number)
+            analyse_model_efm(sbml, out_r_id, out_rev, cur_dir, in_m_id, out_m_id, in_r_id2rev, tree_efm_path,
+                              threshold, max_efm_number)
         S = S_merged
 
-        for serialize in (numpy_efm_serializer.serialize,
-                          numpy_coupled_reaction_group_serializer.serialize):
+        for serialize in (efm_serializer.serialize,
+                          coupled_reaction_group_serializer.serialize):
             description += \
                 serialize(model=model, path=res_dir, get_f_path=get_f_path, in_m_id=in_m_id, out_m_id=out_m_id,
                           out_r_id=out_r_id, S_initial=S_initial, S_coupled=S_folded,
@@ -280,7 +278,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         doc = libsbml.SBMLReader().readSBML(sbml)
         model = doc.getModel()
         description = \
-            numpy_community_serializer.serialize(model, S, id2cluster, id2intersection, id2imp_rns, comm_dir, get_f_path)
+            community_serializer.serialize(model, S, id2cluster, id2intersection, id2imp_rns, comm_dir, get_f_path)
         if len(model_id2sbml) > 1:
             tab2html['Model comparison'] = tab2html['Model comparison'][0] + description, None
         else:

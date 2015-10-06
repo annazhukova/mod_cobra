@@ -3,8 +3,8 @@ import os
 
 import libsbml
 
-from mod_cobra.constraint_based_analysis import round_value, ZERO_THRESHOLD
-from mod_cobra.gibbs.reaction_boundary_manager import get_bounds
+from mod_cobra import round_value, ZERO_THRESHOLD
+from mod_sbml.sbml.reaction_boundary_manager import get_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants
 
 __author__ = 'anna'

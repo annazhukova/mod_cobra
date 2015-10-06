@@ -4,13 +4,8 @@ import os
 import re
 
 import libsbml
-from chebi.chebi_annotator import get_species_to_chebi
-from chebi.chebi_serializer import get_chebi
-from compartment.compartment_manager import need_boundary_compartment, separate_boundary_species
 
-from mod_cobra.constraint_based_analysis.efm.EFM import EFM, TYPE_EFM
-from mod_cobra.gibbs.reaction_boundary_manager import set_bounds
-from onto import parse_simple
+from mod_sbml.sbml.reaction_boundary_manager import set_bounds
 
 __author__ = 'anna'
 
@@ -28,10 +23,12 @@ R_DESCR = "-CAT"
 
 HEADERS = [R_REV, R_IRREV, M_INT, M_EXT, R_DESCR]
 
+
 def get_c_id(model, m_id):
     if model.getCompartment(m_id[-1:]):
         return m_id[-1:]
     return None
+
 
 def convert_metabolite(m_id, model, boundary=False, create_boundary_reaction=False, abbr2name=None, c_id=None):
     if m_id:
@@ -228,7 +225,7 @@ def convert_metatool_output2efm(metatool_file, in_dat=None, r_rev_ids=None, r_ir
                 coefficients = re.findall(r"[-+]?\d*\.*\d+", line)
                 r_id2coefficient = {r_id: float(c) for (r_id, c) in zip(sorted_r_ids, coefficients) if float(c) != 0}
                 if not r_id or r_id in r_id2coefficient:
-                    efms.append(EFM(r_id2coeff=r_id2coefficient, type=TYPE_EFM))
+                    efms.append(r_id2coefficient)
             line = next(f)
     return efms
 

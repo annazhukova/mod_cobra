@@ -1,5 +1,6 @@
 import os
 import unittest
+import numpy as np
 
 import libsbml
 
@@ -8,7 +9,6 @@ from numpy_efm_manager import get_element2id_mapping, model2stoichiometric_matri
     get_yield, get_coupled_reactions, lump_coupled_reactions, get_reaction_duplicates, remove_reaction_duplicates, \
     get_efm_duplicates, remove_efm_duplicates, get_boundary_metabolites, get_efm_groups_based_on_boundary_metabolites, \
     merge_efm_groups, get_len, remove_invalid_efms, get_efm_intersection
-import numpy as np
 
 __author__ = 'anna'
 
