@@ -144,8 +144,9 @@ def remove_efm_duplicates(V, efm_id_groups, efm_id2i):
     new_efm_id2i = dict(zip(ordered_efm_ids, xrange(0, len(ordered_efm_ids))))
     indices = tuple((efm_id2i[efm_id] for efm_id in ordered_efm_ids))
     V_new = V[:, indices]
+    grouped_efm_id = max(efm_id2i.iterkeys())
     for efm_ids, i in zip(efm_id_groups, xrange(len(ordered_efm_ids), len(ordered_efm_ids) + len(efm_id_groups))):
-        grouped_efm_id = i
+        grouped_efm_id += 1
         efm_id2gr_id.update({efm_id: grouped_efm_id for efm_id in efm_ids})
         new_efm_id2i[grouped_efm_id] = i
 
@@ -188,8 +189,9 @@ def merge_efm_groups(V, efm_id_groups, efm_id2i):
     new_efm_id2i = dict(zip(ordered_efm_ids, xrange(0, len(ordered_efm_ids))))
     indices = tuple((efm_id2i[efm_id] for efm_id in ordered_efm_ids))
     V_new = V[:, indices]
+    grouped_efm_id = max(efm_id2i.iterkeys())
     for efm_ids, i in zip(efm_id_groups, xrange(len(ordered_efm_ids), len(ordered_efm_ids) + len(efm_id_groups))):
-        grouped_efm_id = i
+        grouped_efm_id += 1
         efm_id2gr_id.update({efm_id: grouped_efm_id for efm_id in efm_ids})
         new_efm_id2i[grouped_efm_id] = i
 

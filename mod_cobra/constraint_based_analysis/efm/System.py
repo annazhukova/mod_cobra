@@ -47,8 +47,9 @@ class PathwaySet(object):
         v = self.V[:, self.efm_id2i[efm_id]]
         return get_control_efficiency(v, self.r_id2i[r_id])
 
-    def get_efm_intersection(self):
-        return get_efm_intersection(self.V, self.r_id2i)
+    def get_efm_intersection(self, efm_ids=None):
+        return get_efm_intersection(self.V if not efm_ids else self.V[:, [self.efm_id2i[efm_id] for efm_id in efm_ids]],
+                                    self.r_id2i)
 
     def get_efm_ids_by_r_id(self, r_id):
         return [efm_id for (efm_id, i) in self.efm_id2i.iteritems() if self.V[self.r_id2i[r_id], i]]

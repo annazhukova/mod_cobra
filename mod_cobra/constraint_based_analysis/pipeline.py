@@ -5,11 +5,12 @@ import shutil
 
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
-from metabolite_matcher import map_metabolites_compartments, get_model_data
 
+from mod_cobra.constraint_based_analysis.efm.numpy_community_detection import detect_fm_communities, detect_reaction_community
+from metabolite_matcher import map_metabolites_compartments, get_model_data
 from mod_cobra.constraint_based_analysis.efm.efm_pipeline import analyse_model_efm
 from mod_cobra.constraint_based_analysis.html_descriptor import describe
-from mod_sbml.serialization.csv_manager import serialize_common_part_to_csv, serialize_model_info, \
+from mod_sbml.serialization.csv_manager import serialize_model_info, \
     serialize_common_metabolites_compartments_to_csv
 from mod_cobra.constraint_based_analysis.efm.sbml.copled_reaction_sbml_manager import create_folded_sbml
 from model_merge_manager import join, merge
@@ -30,9 +31,10 @@ from mod_sbml.utils.path_manager import create_dirs
 from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
-from model_comparison.model_merger import merge_models, simple_merge_models
-from mod_cobra.constraint_based_analysis.efm.serialization import numpy_efm_serialization_manager, \
-    numpy_coupled_reaction_group_serialization_manager
+from model_comparison.model_merger import simple_merge_models
+from mod_cobra.constraint_based_analysis.efm.serialization import numpy_efm_serializer, \
+    numpy_coupled_reaction_group_serializer
+from mod_cobra.constraint_based_analysis.efm.serialization.numpy_community_serializer import serialize_communities
 
 CHEBI_H = 'chebi:15378'
 
@@ -165,8 +167,8 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
                               threshold, tree_efm_path, max_efm_number)
         S = S_merged
 
-        for serialize in (numpy_efm_serialization_manager.serialize,
-                          numpy_coupled_reaction_group_serialization_manager.serialize):
+        for serialize in (numpy_efm_serializer.serialize,
+                          numpy_coupled_reaction_group_serializer.serialize):
             description += \
                 serialize(model=model, path=res_dir, get_f_path=get_f_path, in_m_id=in_m_id, out_m_id=out_m_id,
                           out_r_id=out_r_id, S_initial=S_initial, S_coupled=S_folded,
@@ -181,40 +183,6 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
             for r_id, new_r_id in r_id2new_r_id.iteritems():
                 if r_id in r_id2mask:
                     r_id2mask[new_r_id] |= r_id2mask[r_id]
-
-        # all_fm_intersection, description, efm_num, fm_block, fm_num, id2fm, mask_shift, model, sbml = efm_analysis(
-        #     cur_dir, description, efms, get_f_path, in_m_id, in_r_id2rev, layer2mask, mask_shift, max_efm_number, model,
-        #     out_m_id, out_r_id, out_rev, r_id2mask, res_dir, sbml, threshold, vis_r_ids)
-        # if efm_num:
-        #     # Communities
-        #     comm_dir = _prepare_dir(cur_dir, 'communities', "Analysing communities...")
-        #     id2cluster = detect_fm_communities(id2fm, threshold=len(all_fm_intersection))
-        #     id2intersection = {cl_id: reduce(lambda p1, p2: p1.intersection(p2),
-        #                                      (id2fm[fm_id] for fm_id in cluster), id2fm[cluster[0]])
-        #                        for (cl_id, cluster) in id2cluster.iteritems()}
-        #     imp_fraction = 60
-        #     r_ids = [r.getId() for r in model.getListOfReactions()]
-        #     rev_r_ids = [r.getId() for r in model.getListOfReactions() if r.getReversible()]
-        #     id2imp_rns = {cl_id: detect_reaction_community(r_ids, rev_r_ids, {fm_id: id2fm[fm_id] for fm_id in cluster},
-        #                                                    imp_fraction, id2intersection[cl_id])
-        #                   for (cl_id, cluster) in id2cluster.iteritems()}
-        #     if id2cluster:
-        #         comm_txt = os.path.join(comm_dir, 'communities.txt')
-        #         serialize_communities(id2cluster, id2intersection, id2imp_rns, fm_num, all_fm_intersection, comm_txt)
-        #         limit = len(id2cluster)
-        #         mask_shift, fms \
-        #             = process_n_fms(directory=comm_dir, id2fm=id2imp_rns, id2mask=r_id2mask,
-        #                             layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
-        #                             name='community', sorter=lambda (cl_id, cl): cl_id,
-        #                             serializer=lambda cl_id, community_txt:
-        #                             serialize_community(cl_id, id2intersection[cl_id], id2imp_rns[cl_id],
-        #                                                 id2cluster[cl_id], model, community_txt),
-        #                             suffix=lambda _: '', limit=limit, get_f_path=get_f_path)
-        #         fm_block = describe('fm_block.html', element_num=limit, characteristics='(all)',
-        #                             element_name='community', fms=fms, all=True)
-        #     description += describe('communities.html', community_num=len(id2cluster),
-        #                             description_filepath=get_f_path(comm_txt) if id2cluster else None,
-        #                             selected_community_block=fm_block)
 
     if not vis_r_ids:
         description += describe('nothing_found.html')
@@ -261,28 +229,17 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
 
         model_id2c_id_groups, model_id2m_id_groups, model_id2c_id2i = \
             map_metabolites_compartments(model_id2chebi_id2m_ids, model_id2dfs)
-        model_id2r_id_groups = []
-        ignore_m_ids = set()
-        for model_id in model_id2S.iterkeys():
-            if CHEBI_H in model_id2chebi_id2m_ids[model_id]:
-                for m_id in model_id2chebi_id2m_ids[model_id][CHEBI_H]:
-                    ignore_m_ids.add((model_id, m_id))
-        S_merged = join(model_id2m_id_groups, model_id2S).remove_unused_metabolites()
-        ignore_m_ids |= {S_merged.m_id2gr_id[m_id] for m_id in ignore_m_ids if m_id in S_merged.m_id2gr_id}
-        S_merged = merge(S_merged, ignore_m_ids)
-        for r_id2c in S_merged.gr_id2r_id2c.itervalues():
-            model_id2r_ids = defaultdict(set)
-            for (model_id, r_id) in r_id2c.iterkeys():
-                model_id2r_ids[model_id].add(r_id)
-            model_id2r_id_groups.append(model_id2r_ids)
-        if model_id2c_id_groups or model_id2m_id_groups:
-            comparison_prefix = os.path.join(mm_dir, 'Model_comparison_')
-            comp_csv, m_csv, r_csv = \
-                serialize_common_metabolites_compartments_to_csv(model_id2dfs, model_id2c_id_groups,
-                                                                 model_id2m_id_groups, model_id2r_id_groups,
-                                                                 comparison_prefix)
-        else:
-            comp_csv, m_csv, r_csv = None, None, None
+        ignore_m_ids = get_ignored_metabolites(model_id2S, model_id2chebi_id2m_ids)
+        S = join(model_id2m_id_groups, model_id2S).remove_unused_metabolites()
+        ignore_m_ids |= {S.m_id2gr_id[m_id] for m_id in ignore_m_ids if m_id in S.m_id2gr_id}
+        S = merge(S, ignore_m_ids)
+        model_id2r_id_groups = get_r_id_groups(S)
+        comp_csv, m_csv, r_csv = serialize_common_metabolites_compartments_to_csv(model_id2dfs, model_id2c_id_groups,
+                                                                                  model_id2m_id_groups,
+                                                                                  model_id2r_id_groups,
+                                                                                  os.path.join(mm_dir,
+                                                                                               'Model_comparison_')) \
+            if model_id2c_id_groups else (None, None, None)
 
         tab2html['Model comparison'] = \
             describe('model_comparison.html',
@@ -291,7 +248,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         title = 'Combined model analysis'
 
         merged_sbml = os.path.join(res_dir, 'Merged_model.xml')
-        model_id2id2id, common_ids = simple_merge_models(S_merged, model_id2c_id2i, model_id2dfs, merged_sbml)
+        model_id2id2id, common_ids, S = simple_merge_models(S, model_id2c_id2i, model_id2dfs, merged_sbml)
 
         id2mask = defaultdict(lambda: 0)
         vis_r_ids = set()
@@ -301,31 +258,79 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
             vis_r_ids |= {model_id2id2id[model_id][r_id] for r_id in model_id2vis_r_ids[model_id]
                           if r_id in model_id2id2id[model_id]}
 
-        colors = get_n_colors(len(model_id2sbml) + 1, 0.5, 0.8)
-        info = ''
-        mixed_color = None
-        if common_ids:
-            mixed_color = colors[0]
-            r, g, b = mixed_color
-            info = describe('color.html', r=r, g=g, b=b, name='common reactions/metabolites')
-        model_id2color = dict(zip(model_id2sbml.iterkeys(), colors[1:]))
-        id2color = {}
-        for model_id, id2id in model_id2id2id.iteritems():
-            color = model_id2color[model_id]
-            r, g, b = color
-            id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.itervalues()})
-            info += describe('color.html', r=r, g=g, b=b, name=model_id)
-
+        id2color, info = get_colors(common_ids, model_id2id2id, model_id2sbml)
         sbml = merged_sbml
     else:
         model_id, sbml = next(model_id2sbml.iteritems())
         vis_r_ids = model_id2vis_r_ids[model_id]
         id2mask = model_id2id2mask[model_id]
         id2color = None
-        info = ''
+        S = model_id2S[model_id]
         title = 'Model analysis'
 
-    visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html)
+
+    # Communities
+    comm_dir = _prepare_dir(res_dir, 'communities', "Analysing communities...")
+    id2cluster = detect_fm_communities(S, len(S.pws.get_efm_intersection()))
+    id2intersection = {cl_id: S.pws.get_efm_intersection(cluster) for (cl_id, cluster) in id2cluster.iteritems()}
+    imp_fraction = 60
+    id2imp_rns = {cl_id: detect_reaction_community(S, cluster, imp_fraction, id2intersection[cl_id])
+                  for (cl_id, cluster) in id2cluster.iteritems()}
+    if id2cluster:
+        comm_txt = os.path.join(comm_dir, 'communities.txt')
+        serialize_communities(S, id2cluster, id2intersection, id2imp_rns, comm_txt)
+        # limit = len(id2cluster)
+    #     mask_shift, fms \
+    #         = process_n_fms(directory=comm_dir, id2fm=id2imp_rns, id2mask=r_id2mask,
+    #                         layer2mask=layer2mask, mask_shift=mask_shift, vis_r_ids=vis_r_ids,
+    #                         name='community', sorter=lambda (cl_id, cl): cl_id,
+    #                         serializer=lambda cl_id, community_txt:
+    #                         serialize_community(cl_id, id2intersection[cl_id], id2imp_rns[cl_id],
+    #                                             id2cluster[cl_id], model, community_txt),
+    #                         suffix=lambda _: '', limit=limit, get_f_path=get_f_path)
+    #     fm_block = describe('fm_block.html', element_num=limit, characteristics='(all)',
+    #                         element_name='community', fms=fms, all=True)
+    # description += describe('communities.html', community_num=len(id2cluster),
+    #                         description_filepath=get_f_path(comm_txt) if id2cluster else None,
+    #                         selected_community_block=fm_block)
+
+    visualize_model(sbml, vis_r_ids, id2mask, id2color, title, '', invisible_layers, layer2mask, res_dir, tab2html)
+
+
+def get_colors(common_ids, model_id2id2id, model_id2sbml):
+    colors = get_n_colors(len(model_id2sbml) + 1, 0.5, 0.8)
+    mixed_color = None
+    if common_ids:
+        mixed_color = colors[0]
+        r, g, b = mixed_color
+        info = describe('color.html', r=r, g=g, b=b, name='common reactions/metabolites')
+    model_id2color = dict(zip(model_id2sbml.iterkeys(), colors[1:]))
+    id2color = {}
+    for model_id, id2id in model_id2id2id.iteritems():
+        color = model_id2color[model_id]
+        r, g, b = color
+        id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.itervalues()})
+        info += describe('color.html', r=r, g=g, b=b, name=model_id)
+    return id2color, info
+
+
+def get_r_id_groups(S_merged):
+    model_id2r_id_groups = []
+    for r_id2c in S_merged.gr_id2r_id2c.itervalues():
+        model_id2r_ids = defaultdict(set)
+        for (model_id, r_id) in r_id2c.iterkeys():
+            model_id2r_ids[model_id].add(r_id)
+        model_id2r_id_groups.append(model_id2r_ids)
+    return model_id2r_id_groups
+
+
+def get_ignored_metabolites(model_id2S, model_id2chebi_id2m_ids):
+    ignore_m_ids = set()
+    for model_id in model_id2S.iterkeys():
+        if CHEBI_H in model_id2chebi_id2m_ids[model_id]:
+            for m_id in model_id2chebi_id2m_ids[model_id][CHEBI_H]:
+                ignore_m_ids.add((model_id, m_id))
+    return ignore_m_ids
 
 
 def visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html):
