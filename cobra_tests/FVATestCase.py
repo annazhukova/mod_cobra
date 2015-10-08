@@ -4,13 +4,14 @@ import unittest
 
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 
-from fbva import analyse_by_fva
+from mod_cobra.fbva.fbva_analyser import analyse_by_fva
 from cobra_tests.SBMLTestCase import DATA_DIR, TEST_SBML, create_test_sbml
 from mod_sbml.utils.path_manager import create_dirs
 
 __author__ = 'anna'
 
 FVA_DIR = os.path.join(DATA_DIR, 'fva')
+
 
 class FVATestCase(unittest.TestCase):
 

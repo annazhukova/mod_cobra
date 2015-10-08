@@ -31,6 +31,7 @@ setup(name='mod_cobra',
           'Topic :: Software Development',
       ],
       download_url='https://github.com/annazhukova/mod_cobra',
-      install_requires=['openpyxl', 'python-libsbml-experimental', 'numpy', 'matplotlib', 'cobra',
-                        'mod_sbml', 'tulip', 'sympy', 'jinja2', 'igraph', 'louvain', 'scipy']
-)
+      install_requires=['python-libsbml-experimental', 'numpy', 'cobra', 'mod_sbml', 'scipy', 'jinja2', 'igraph',
+                        'louvain', 'sbml_vis']
+      )
+

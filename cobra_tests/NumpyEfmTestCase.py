@@ -4,11 +4,11 @@ import numpy as np
 
 import libsbml
 
-from SBMLTestCase import create_test_sbml, TEST_SBML
-from numpy_efm_manager import get_element2id_mapping, model2stoichiometric_matrix, get_efm_matrix, get_control_efficiency, \
-    get_yield, get_coupled_reactions, lump_coupled_reactions, get_reaction_duplicates, remove_reaction_duplicates, \
-    get_efm_duplicates, remove_efm_duplicates, get_boundary_metabolites, get_efm_groups_based_on_boundary_metabolites, \
-    merge_efm_groups, get_len, remove_invalid_efms, get_efm_intersection
+from cobra_tests.SBMLTestCase import create_test_sbml, TEST_SBML
+from mod_cobra.efm.numpy_efm_manager import get_element2id_mapping, model2stoichiometric_matrix, get_efm_matrix, \
+    get_control_efficiency, get_yield, get_coupled_reactions, lump_coupled_reactions, get_reaction_duplicates, \
+    remove_reaction_duplicates, get_efm_duplicates, remove_efm_duplicates, get_boundary_metabolites, \
+    get_efm_groups_based_on_boundary_metabolites, merge_efm_groups, get_len, remove_invalid_efms, get_efm_intersection
 
 __author__ = 'anna'
 

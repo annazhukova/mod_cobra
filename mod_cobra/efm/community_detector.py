@@ -7,20 +7,24 @@ from louvain import find_partition
 __author__ = 'anna'
 
 
-def detect_fm_communities(S, threshold):
-    logging.info("Going to detect communities in FMs, using %d as a threshold." % threshold)
-
+def detect_fm_communities(S):
     g = Graph(directed=False)
     g.add_vertices(len(S.efm_id2i))
 
     fm_ids = list(S.efm_id2i.iterkeys())
+    fm_id_pair2count = {}
     i = 1
     for fm_id_1 in fm_ids:
         for fm_id_2 in fm_ids[i:]:
-            w = len(S.pws.get_efm_intersection(efm_ids=(fm_id_1, fm_id_2))) - threshold
-            if w > 0:
-                g.add_edge(S.efm_id2i[fm_id_1], S.efm_id2i[fm_id_2], weight=w)
+            fm_id_pair2count[(fm_id_1, fm_id_2)] = len(S.pws.get_efm_intersection(efm_ids=(fm_id_1, fm_id_2)))
         i += 1
+
+    avg_intersection = sum(fm_id_pair2count.itervalues()) / len(fm_id_pair2count)
+    logging.info("Going to detect communities in FMs, using %d as a threshold." % avg_intersection)
+
+    for (fm_id_1, fm_id_2), w in fm_id_pair2count.iteritems():
+        if w > avg_intersection:
+            g.add_edge(S.efm_id2i[fm_id_1], S.efm_id2i[fm_id_2], weight=w - avg_intersection)
 
     partition = find_partition(graph=g, method='Modularity', weight='weight')
     i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.iteritems()}
@@ -28,14 +32,11 @@ def detect_fm_communities(S, threshold):
                     ([i2efm_id[i] for i in cluster] for cluster in partition)))
 
 
-def detect_reaction_community(S, efm_ids, threshold_percent, selected_fm):
-    logging.info("Going to detect the largest reaction community, using %d%% as a threshold." % threshold_percent)
+def detect_reaction_community(S, efm_ids, selected_fm):
 
     g = Graph(directed=False)
     # the id of the reversed version of a reaction r_id reversed would be len(S.r_id2i) + S.r_id2i[r_id]
     g.add_vertices(2 * len(S.r_id2i))
-
-    threshold = threshold_percent * len(efm_ids) / 100
 
     r_id_pair2count = Counter()
     for efm_id in efm_ids:
@@ -46,9 +47,13 @@ def detect_reaction_community(S, efm_ids, threshold_percent, selected_fm):
             i += 1
             for r_id2 in r_ids[i:]:
                 r_id_pair2count.update({tuple(sorted([r_id, r_id2])): 1})
+
+    avg_intersection = sum(r_id_pair2count.itervalues()) / len(r_id_pair2count)
+    logging.info("Going to detect the largest reaction community, using %d as a threshold." % avg_intersection)
+
     for (r_id1, r_id2), count in r_id_pair2count.iteritems():
-        if count > threshold:
-            g.add_edge(r_id1, r_id2, weight=count - threshold)
+        if count > avg_intersection:
+            g.add_edge(r_id1, r_id2, weight=count - avg_intersection)
 
     partition = find_partition(graph=g, method='Modularity', weight='weight')
 

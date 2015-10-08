@@ -3,7 +3,7 @@ import unittest
 
 import libsbml
 
-from metatool_manager import convert_metabolite, convert_reaction
+from mod_cobra.efm.metatool_manager import convert_metabolite, convert_reaction
 import cobra_tests
 
 __author__ = 'anna'

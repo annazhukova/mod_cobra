@@ -73,7 +73,7 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, threshold=
                 values = line.replace("\n", "").strip().split(" ")
                 r_id2coefficient = {}
                 bad_em = False
-                for (v, i) in zip(values, xrange(1, len(values) + 1)):
+                for i, v in enumerate(values, start=1):
                     v = round_value(v)
                     if not v or abs(v) <= threshold:
                         continue

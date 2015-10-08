@@ -130,7 +130,7 @@ class FoldedSystem(System):
         self.gr_id2r_id2c = gr_id2r_id2c
         self.efm_id2gr_id = efm_id2gr_id if efm_id2gr_id else {}
         self.gr_id2efm_ids = invert_map(self.efm_id2gr_id)
-        self.m_id2gr_id = m_id2gr_id
+        self.m_id2gr_id = m_id2gr_id if m_id2gr_id else {}
 
     def remove_efm_duplicates(self):
         duplicated_efm_id_groups = self.pws.get_efm_duplicates()

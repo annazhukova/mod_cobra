@@ -1,6 +1,6 @@
 import libsbml
 
-from mod_sbml.sbml.sbml_manager import create_reaction
+from mod_sbml.sbml.sbml_manager import create_reaction, create_compartment
 from mod_sbml.sbml.submodel_manager import remove_unused_species
 
 __author__ = 'anna'
@@ -37,6 +37,10 @@ def create_folded_sbml(S_coupled, S_no_duplicates, in_sbml, out_sbml):
 
     for r_id in r_ids_to_remove:
         model.removeReaction(r_id)
+
+    for r in model.getListOfReactions():
+        for i in xrange(0, r.getNumModifiers()):
+            r.removeModifier(0)
 
     remove_unused_species(model)
     model.setId('%s_folded' % model.getId())

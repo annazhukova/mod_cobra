@@ -18,7 +18,7 @@ def get_element2id_mapping(model):
 
 def get_efm_matrix(r_id2coefficient_list, r_id2i):
     rows, cols, data = [], [], []
-    for efm_id, r_id2coef in zip(xrange(0, len(r_id2coefficient_list)), r_id2coefficient_list):
+    for efm_id, r_id2coef in enumerate(r_id2coefficient_list):
         cols.extend([efm_id] * len(r_id2coef))
         rows.extend((r_id2i[r_id] for r_id in r_id2coef.iterkeys()))
         data.extend(r_id2coef.itervalues())
@@ -81,7 +81,7 @@ def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
     r_id2lr_id = {}
     lr_id2r_id2c = {}
     lr_i = 0
-    for r_ids, i in zip(coupled_r_id_groups, xrange(len(ordered_r_ids), len(ordered_r_ids) + len(coupled_r_id_groups))):
+    for i, r_ids in enumerate(coupled_r_id_groups, start=len(ordered_r_ids)):
         lumped_r_id, lr_i = get_unique_id(new_r_id2i, 'r_group', lr_i)
         r_id2lr_id.update({r_id: lumped_r_id for r_id in r_ids})
         new_r_id2i[lumped_r_id] = i
@@ -114,7 +114,7 @@ def remove_reaction_duplicates(N, V, r_id_groups, r_id2i):
     V_new = V[indices, :]
     gr_id2r_id2c = {}
     gr_i = 0
-    for r_ids, i in zip(r_id_groups, xrange(len(ordered_r_ids), len(ordered_r_ids) + len(r_id_groups))):
+    for i, r_ids in enumerate(r_id_groups, start=len(ordered_r_ids)):
         grouped_r_id, gr_i = get_unique_id(new_r_id2i, 'r_type', gr_i)
         r_id2gr_id.update({r_id: grouped_r_id for r_id in r_ids})
         new_r_id2i[grouped_r_id] = i
@@ -146,7 +146,7 @@ def remove_efm_duplicates(V, efm_id_groups, efm_id2i):
     indices = tuple((efm_id2i[efm_id] for efm_id in ordered_efm_ids))
     V_new = V[:, indices]
     gr_i = 0
-    for efm_ids, i in zip(efm_id_groups, xrange(len(ordered_efm_ids), len(ordered_efm_ids) + len(efm_id_groups))):
+    for i, efm_ids in enumerate(efm_id_groups, start=len(ordered_efm_ids)):
         grouped_efm_id, gr_i = get_unique_id(new_efm_id2i, 'folded_efm', gr_i)
 
         efm_id2gr_id.update({efm_id: grouped_efm_id for efm_id in efm_ids})
@@ -200,7 +200,7 @@ def merge_efm_groups(V, efm_id_groups, efm_id2i):
     indices = tuple((efm_id2i[efm_id] for efm_id in ordered_efm_ids))
     V_new = V[:, indices]
     gr_i = 0
-    for efm_ids, i in zip(efm_id_groups, xrange(len(ordered_efm_ids), len(ordered_efm_ids) + len(efm_id_groups))):
+    for i, efm_ids in enumerate(efm_id_groups, start=len(ordered_efm_ids)):
         grouped_efm_id, gr_i = get_unique_id(new_efm_id2i, 'pathway', gr_i)
         efm_id2gr_id.update({efm_id: grouped_efm_id for efm_id in efm_ids})
         new_efm_id2i[grouped_efm_id] = i

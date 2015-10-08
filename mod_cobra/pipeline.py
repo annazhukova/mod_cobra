@@ -6,16 +6,18 @@ import shutil
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
 
-from model_comparison.metabolite_matcher import map_metabolites_compartments, get_model_data
-from model_comparison.model_merge_manager import join, merge
-from model_comparison.model_merger import simple_merge_models
-
+from mod_sbml.annotation.chebi.chebi_annotator import EQUIVALENT_RELATIONSHIPS
+from mod_sbml.annotation.chebi.chebi_serializer import get_chebi
+from mod_cobra.mapping.metabolite_matcher import map_metabolites_compartments, get_model_data
+from mod_cobra.mapping.model_merge_manager import join, merge
+from mod_cobra.mapping.model_merger import simple_merge_models
 from mod_cobra.efm.community_detector import detect_fm_communities, detect_reaction_community
 from mod_cobra.efm.efm_pipeline import analyse_model_efm
 from mod_cobra.html import describe
 from mod_sbml.serialization.csv_manager import serialize_model_info, \
     serialize_common_metabolites_compartments_to_csv
 from mod_cobra.efm.serialization.coupled_reaction_sbml_manager import create_folded_sbml
+from mod_sbml.onto import parse_simple
 from sbml_vis.graph.color.color import get_n_colors
 from mod_cobra import ZERO_THRESHOLD
 from mod_cobra.fbva.serialization.fbva_serializer import serialize_fva, serialize_fluxes
@@ -23,7 +25,7 @@ from mod_cobra.fbva.serialization import format_r_id
 from mod_cobra.sbml import r_ids2sbml
 from mod_sbml.sbml.reaction_boundary_manager import get_bounds, set_bounds
 from mod_sbml.sbml.sbml_manager import get_products, get_reactants, reverse_reaction, get_r_comps
-from mimoza_pipeline import process_sbml
+from sbml_vis.mimoza_pipeline import process_sbml
 from mod_cobra.fbva.fbva_analyser import analyse_by_fba, analyse_by_fva
 from mod_cobra.fbva.serialization.fbva_sbml_manager import create_fva_model
 from mod_sbml.utils.path_manager import create_dirs
@@ -100,11 +102,13 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
         shutil.copy(sbml, res_dir)
         sbml = os.path.join(res_dir, os.path.basename(sbml))
 
-    logging.info("Serializing model info...")
-    info_prefix = os.path.join(res_dir, 'model_info_')
-    c_csv, m_csv, r_csv = serialize_model_info(sbml, info_prefix)
     doc = libsbml.SBMLReader().readSBML(sbml)
     model = doc.getModel()
+
+    logging.info("Serializing model info...")
+    info_prefix = os.path.join(res_dir, 'model_info_')
+    c_csv, m_csv, r_csv = serialize_model_info(model, info_prefix)
+
     r_string = lambda r, rev: '<b>%s</b>%s: %s' % (r.getId(), ' (reversed)' if rev else '',
                                                    get_sbml_r_formula(model, r, show_metabolite_ids=False))
     r = model.getReaction(out_r_id)
@@ -127,7 +131,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
         cobra_model = create_cobra_model_from_sbml_file(sbml) if not cobra_model else cobra_model
         r_id2bounds, opt_val = analyse_by_fva(cobra_model=cobra_model, bm_r_id=out_r_id,
                                               objective_sense=objective_sense, threshold=threshold)
-        ess_rn_num, var_rn_num = 0, 0
+        ess_rn_num, var_rn_num, fva_file = 0, 0, None
         if opt_val:
             fva_file = os.path.join(cur_dir, 'fva.txt')
             ess_rn_num, var_rn_num = serialize_fva(cobra_model, r_id2bounds, fva_file, objective_sense, out_r_id)
@@ -140,21 +144,22 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
             doc = libsbml.SBMLReader().readSBML(sbml)
             model = doc.getModel()
         description += describe('fva.html', optimal_value=opt_val, ess_r_num=ess_rn_num, var_r_num=var_rn_num,
-                                description_filepath=get_f_path(fva_file) if opt_val else None,
-                                sbml_filepath=get_f_path(fva_sbml) if opt_val else None)
+                                description_filepath=get_f_path(fva_file),
+                                sbml_filepath=get_f_path(sbml))
 
     if do_fba:
         cur_dir = _prepare_dir(res_dir, 'fba', "Performing FBA...")
         cobra_model = create_cobra_model_from_sbml_file(sbml) if not cobra_model else cobra_model
         r_id2val, opt_val = analyse_by_fba(cobra_model, bm_r_id=out_r_id, objective_sense=objective_sense,
                                            threshold=threshold)
+        fba_file = None
         if opt_val:
             mask_shift = update_vis_layers(r_id2val, 'FBA', r_id2mask, layer2mask, mask_shift, vis_r_ids)
             main_layer = 'FBA'
             fba_file = os.path.join(cur_dir, 'fba.txt')
             serialize_fluxes(cobra_model, r_id2val, path=fba_file, objective_sense=objective_sense, out_r_id=out_r_id)
         description += describe('fba.html', optimal_value=opt_val, r_num=len(r_id2val),
-                                description_filepath=get_f_path(fba_file) if opt_val else None)
+                                description_filepath=get_f_path(fba_file))
 
     S = None
     if do_efm:
@@ -164,12 +169,12 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
                               threshold, max_efm_number)
         S = S_merged
 
-        for serialize in (efm_serializer.serialize,
-                          coupled_reaction_group_serializer.serialize):
+        for serializer in (efm_serializer.serialize, coupled_reaction_group_serializer.serialize):
             description += \
-                serialize(model=model, path=res_dir, get_f_path=get_f_path, in_m_id=in_m_id, out_m_id=out_m_id,
+                serializer(model=model, path=cur_dir, get_f_path=get_f_path, in_m_id=in_m_id, out_m_id=out_m_id,
                           out_r_id=out_r_id, S_initial=S_initial, S_coupled=S_folded,
                           S_no_duplicates=S_folded_wo_duplicates, S_merged=S_merged)
+        logging.info('Serialized EFMA')
 
         if S_folded.gr_id2r_id2c or S_folded_wo_duplicates.gr_id2r_id2c:
             clique_merged_sbml = os.path.join(cur_dir, 'Model_folded.xml')
@@ -222,21 +227,25 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         mm_dir = os.path.join(res_dir, 'merged_model')
         create_dirs(mm_dir)
 
-        model_id2chebi_id2m_ids, model_id2dfs = get_model_data(model_id2sbml)
+        logging.info('Going to merge models...')
+        chebi = parse_simple(get_chebi())
+        model_id2dfs = get_model_data(model_id2sbml, chebi=chebi)
 
-        model_id2c_id_groups, model_id2m_id_groups, model_id2c_id2i = \
-            map_metabolites_compartments(model_id2chebi_id2m_ids, model_id2dfs)
-        ignore_m_ids = get_ignored_metabolites(model_id2S, model_id2chebi_id2m_ids)
+        model_id2c_id_groups, model_id2m_id_groups, model_id2c_id2i = map_metabolites_compartments(model_id2dfs)
+        logging.info('Mapped metabolites and compartments.')
+        ignore_m_ids = get_ignored_metabolites(model_id2dfs, chebi)
         S = join(model_id2m_id_groups, model_id2S).remove_unused_metabolites()
         ignore_m_ids |= {S.m_id2gr_id[m_id] for m_id in ignore_m_ids if m_id in S.m_id2gr_id}
         S = merge(S, ignore_m_ids)
         model_id2r_id_groups = get_r_id_groups(S)
+        logging.info('Mapped reactions.')
         comp_csv, m_csv, r_csv = serialize_common_metabolites_compartments_to_csv(model_id2dfs, model_id2c_id_groups,
                                                                                   model_id2m_id_groups,
                                                                                   model_id2r_id_groups,
                                                                                   os.path.join(mm_dir,
                                                                                                'Model_comparison_')) \
             if model_id2c_id_groups else (None, None, None)
+        logging.info('Serialized the mappings.')
 
         tab2html['Model comparison'] = \
             describe('model_comparison.html',
@@ -269,10 +278,9 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
 
     # Communities
     comm_dir = _prepare_dir(res_dir, 'communities', "Analysing communities...")
-    id2cluster = detect_fm_communities(S, len(S.pws.get_efm_intersection()))
+    id2cluster = detect_fm_communities(S)
     id2intersection = {cl_id: S.pws.get_efm_intersection(cluster) for (cl_id, cluster) in id2cluster.iteritems()}
-    imp_fraction = 60
-    id2imp_rns = {cl_id: detect_reaction_community(S, cluster, imp_fraction, id2intersection[cl_id])
+    id2imp_rns = {cl_id: detect_reaction_community(S, cluster, id2intersection[cl_id])
                   for (cl_id, cluster) in id2cluster.iteritems()}
     if id2cluster:
         doc = libsbml.SBMLReader().readSBML(sbml)
@@ -286,6 +294,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         for cl_id, r_id2c in id2imp_rns.iteritems():
             mask_shift = update_vis_layers(r_id2c, 'Pathway community %s' % cl_id, id2mask, layer2mask, mask_shift,
                                            vis_r_ids)
+            invisible_layers.append('Pathway community %s' % cl_id)
 
     visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html)
 
@@ -318,11 +327,13 @@ def get_r_id_groups(S_merged):
     return model_id2r_id_groups
 
 
-def get_ignored_metabolites(model_id2S, model_id2chebi_id2m_ids):
+def get_ignored_metabolites(model_id2dfs, chebi):
+    ignore_ch_ids = chebi.get_surroundings(chebi.get_term(CHEBI_H), relationships=EQUIVALENT_RELATIONSHIPS, radius=1)
     ignore_m_ids = set()
-    for model_id in model_id2S.iterkeys():
-        if CHEBI_H in model_id2chebi_id2m_ids[model_id]:
-            for m_id in model_id2chebi_id2m_ids[model_id][CHEBI_H]:
+    for model_id, [df, _, _] in model_id2dfs.iteritems():
+        for index, row in df.iterrows():
+            m_id, t_id = row['Id'], row["ChEBI"]
+            if t_id in ignore_ch_ids:
                 ignore_m_ids.add((model_id, m_id))
     return ignore_m_ids
 
