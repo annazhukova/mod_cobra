@@ -85,8 +85,8 @@ def main():
     multimodel_pipeline({
         SR_MODEL_SER: (SR_SER_PRODUCTION, False, {SR_GLN_EXCHANGE: False}, SR_GLN_B, SR_SER_B, 'SR'),
         RR_MODEL: (RR_SER_PRODUCTION, False, {RR_GLN_EXCHANGE: False}, RR_GLN_B, RR_SER_B, 'RR'),
-        UHLEN_MODEL: (UH_SER_PRODUCTION, False, {UH_GLN_IN: False}, UH_GLN_B, UH_SER_B, 'Uhlen'),
-        RECON_MODEL: (RECON_SER_PRODUCTION, False, {RECON_GLN_EXCHANGE: True}, RECON_GLN_B, RECON_SER_B, 'Recon2')
+        # UHLEN_MODEL: (UH_SER_PRODUCTION, False, {UH_GLN_IN: False}, UH_GLN_B, UH_SER_B, 'Uhlen'),
+        # RECON_MODEL: (RECON_SER_PRODUCTION, False, {RECON_GLN_EXCHANGE: True}, RECON_GLN_B, RECON_SER_B, 'Recon2')
     }, os.path.join(DATA_DIR, 'Human_500'), do_fba=True, do_fva=True, do_efm=True, max_efm_number=500)
 
 if "__main__" == __name__:
