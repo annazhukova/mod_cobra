@@ -4,7 +4,7 @@ import libsbml
 
 from mod_sbml.serialization.csv_manager import metabolites2df, reactions2df, compartments2df
 from mod_sbml.sbml.compartment.compartment_positioner import get_go_term, GO_CYTOSOL, GO_CYTOPLASM
-from mod_sbml.annotation. chebi.chebi_annotator import get_species_to_chebi
+from mod_sbml.annotation.chebi.chebi_annotator import get_species_to_chebi
 from mod_sbml.onto import parse_simple
 from mod_sbml.annotation.chebi.chebi_serializer import get_chebi
 from mod_sbml.annotation.gene_ontology.go_serializer import get_go
