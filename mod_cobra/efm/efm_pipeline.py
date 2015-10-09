@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 
 import libsbml
@@ -20,13 +21,17 @@ def analyse_model_efm(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_
                                         tree_efm_path, max_efm_number, threshold)
     logging.info('Computed initial system')
     system_folded = system_initial.lump_coupled_reactions().remove_unused_metabolites()
+    r_id2w = defaultdict(lambda: 1)
+    r_id2w.update({gr_r_id: len(r_id2c) for (gr_r_id, r_id2c) in system_folded.gr_id2r_id2c.iteritems()})
     logging.info('Folded pathways')
     system_folded_no_duplicates = \
         system_folded.remove_reaction_duplicates().remove_efm_duplicates()
+    r_id2w.update({gr_r_id: max(r_id2w[r_id] for r_id in r_id2c.iterkeys())
+                   for (gr_r_id, r_id2c) in system_folded_no_duplicates.gr_id2r_id2c.iteritems()})
     logging.info('Removed duplicates')
     system_merged = system_folded_no_duplicates.merge_efm_groups()
     logging.info('Merged pathways')
-    return system_initial, system_folded, system_folded_no_duplicates, system_merged
+    return system_initial, system_folded, system_folded_no_duplicates, system_merged, r_id2w
 
 
 def get_initial_system(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id,

@@ -7,6 +7,18 @@ from mod_cobra.pipeline import multimodel_pipeline
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(mod_cobra.__file__)), '..', 'examples', 'data')
 
+# -----------------Uhlen----------------------------------------------
+UHLEN_MODEL = os.path.join(DATA_DIR, "Uhlen_heart_MODEL1411240029.xml")
+
+UH_SER_PRODUCTION = 'R_HMR_3843'
+
+UH_GLN_IN = 'R_HMR_9063'
+UH_SER_IN = 'R_HMR_9069'
+
+UH_SER_B = 'M_m02896x'
+UH_GLN_B = 'M_m01975x'
+
+
 # -----------------Smith-Robinson--------------------
 SR_MODEL_SER = os.path.join(DATA_DIR, "SR_serine.xml")
 
@@ -26,7 +38,7 @@ SR_SER_PRODUCTION = 'R_PSP_Lc'
 SR_SER_B = 'C00065_b'
 SR_GLN_B = 'C00064_b'
 
-# -----------------------RR-----------------
+# --------------------RR--------------------
 RR_MODEL = os.path.join(DATA_DIR, 'RR12.xml')
 
 RR_GLC_EXCHANGE = 'GLUCc_exchange'
@@ -73,9 +85,9 @@ def main():
     multimodel_pipeline({
         SR_MODEL_SER: (SR_SER_PRODUCTION, False, {SR_GLN_EXCHANGE: False}, SR_GLN_B, SR_SER_B, 'SR'),
         RR_MODEL: (RR_SER_PRODUCTION, False, {RR_GLN_EXCHANGE: False}, RR_GLN_B, RR_SER_B, 'RR'),
-        # RECON_MODEL: (RECON_SER_PRODUCTION, False, {RECON_GLN_EXCHANGE: True},
-        #                          RECON_GLN_B, RECON_SER_B, 'Recon2')
-    }, os.path.join(DATA_DIR, 'Human_SR_RR_500'), do_fba=True, do_fva=True, do_efm=True, max_efm_number=500)
+        UHLEN_MODEL: (UH_SER_PRODUCTION, False, {UH_GLN_IN: False}, UH_GLN_B, UH_SER_B, 'Uhlen'),
+        RECON_MODEL: (RECON_SER_PRODUCTION, False, {RECON_GLN_EXCHANGE: True}, RECON_GLN_B, RECON_SER_B, 'Recon2')
+    }, os.path.join(DATA_DIR, 'Human_500'), do_fba=True, do_fva=True, do_efm=True, max_efm_number=500)
 
 if "__main__" == __name__:
     sys.exit(main())

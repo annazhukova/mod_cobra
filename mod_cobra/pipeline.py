@@ -14,8 +14,7 @@ from mod_cobra.mapping.model_merger import simple_merge_models
 from mod_cobra.efm.community_detector import detect_fm_communities, detect_reaction_community
 from mod_cobra.efm.efm_pipeline import analyse_model_efm
 from mod_cobra.html import describe
-from mod_sbml.serialization.csv_manager import serialize_model_info, \
-    serialize_common_metabolites_compartments_to_csv
+from mod_sbml.serialization.csv_manager import serialize_model_info, serialize_common_elements_to_csv
 from mod_cobra.efm.serialization.coupled_reaction_sbml_manager import create_folded_sbml
 from mod_sbml.onto import parse_simple
 from sbml_vis.graph.color.color import get_n_colors
@@ -29,7 +28,7 @@ from sbml_vis.mimoza_pipeline import process_sbml
 from mod_cobra.fbva.fbva_analyser import analyse_by_fba, analyse_by_fva
 from mod_cobra.fbva.serialization.fbva_sbml_manager import create_fva_model
 from mod_sbml.utils.path_manager import create_dirs
-from mod_sbml.serialization.serialization_manager import get_sbml_r_formula
+from mod_sbml.serialization import get_sbml_r_formula
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
 from mod_cobra.efm.serialization import coupled_reaction_group_serializer, community_serializer, efm_serializer
@@ -112,13 +111,13 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
     r_string = lambda r, rev: '<b>%s</b>%s: %s' % (r.getId(), ' (reversed)' if rev else '',
                                                    get_sbml_r_formula(model, r, show_metabolite_ids=False))
     r = model.getReaction(out_r_id)
-    description = describe('input_data.html', model_name=model.getName() if model.getName() else model.getId(),
+    description = describe('input_data.html',
+                           model_name=(model.getName() if model.getName() else model.getId()),
                            sbml_filepath=get_f_path(sbml), c_csv=get_f_path(c_csv),
                            m_csv=get_f_path(m_csv), r_csv=get_f_path(r_csv), obj_rn=r_string(r, out_rev),
                            in_rn_len=len(in_r_id2rev) if in_r_id2rev else 0,
-                           in_rns=
-                           '; '.join(r_string(model.getReaction(r_id), rev) for (r_id, rev) in in_r_id2rev.iteritems())
-                           if in_r_id2rev else '')
+                           in_rns='; '.join(r_string(model.getReaction(r_id), rev)
+                                            for (r_id, rev) in in_r_id2rev.iteritems()) if in_r_id2rev else '')
 
     r_id2mask = defaultdict(lambda: 0)
     layer2mask = {}
@@ -126,6 +125,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
     objective_sense = 'minimize' if out_rev else 'maximize'
     vis_r_ids = set()
     cobra_model = None
+    opt_val = None
     if do_fva:
         cur_dir = _prepare_dir(res_dir, 'fva', "Performing FVA...")
         cobra_model = create_cobra_model_from_sbml_file(sbml) if not cobra_model else cobra_model
@@ -161,10 +161,10 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
         description += describe('fba.html', optimal_value=opt_val, r_num=len(r_id2val),
                                 description_filepath=get_f_path(fba_file))
 
-    S = None
+    S, r_id2w = None, {}
     if do_efm:
         cur_dir = _prepare_dir(res_dir, 'efma', "Performing EFMA...")
-        S_initial, S_folded, S_folded_wo_duplicates, S_merged = \
+        S_initial, S_folded, S_folded_wo_duplicates, S_merged, r_id2w = \
             analyse_model_efm(sbml, out_r_id, out_rev, cur_dir, in_m_id, out_m_id, in_r_id2rev, tree_efm_path,
                               threshold, max_efm_number)
         S = S_merged
@@ -172,8 +172,8 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
         for serializer in (efm_serializer.serialize, coupled_reaction_group_serializer.serialize):
             description += \
                 serializer(model=model, path=cur_dir, get_f_path=get_f_path, in_m_id=in_m_id, out_m_id=out_m_id,
-                          out_r_id=out_r_id, S_initial=S_initial, S_coupled=S_folded,
-                          S_no_duplicates=S_folded_wo_duplicates, S_merged=S_merged)
+                           out_r_id=out_r_id, S_initial=S_initial, S_coupled=S_folded,
+                           S_no_duplicates=S_folded_wo_duplicates, S_merged=S_merged)
         logging.info('Serialized EFMA')
 
         if S_folded.gr_id2r_id2c or S_folded_wo_duplicates.gr_id2r_id2c:
@@ -186,10 +186,10 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
                 if r_id in r_id2mask:
                     r_id2mask[new_r_id] |= r_id2mask[r_id]
 
-    if not vis_r_ids:
+    if not opt_val and not S.efm_id2i:
         description += describe('nothing_found.html')
 
-    return S, sbml, vis_r_ids, description, mask_shift, r_id2mask, layer2mask, main_layer
+    return S, r_id2w, sbml, vis_r_ids, description, mask_shift, r_id2mask, layer2mask, main_layer
 
 
 def mean(values):
@@ -208,9 +208,10 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
     model_id2vis_r_ids = {}
     model_id2sbml = {}
     model_id2S = {}
+    model_id2r_id2w = {}
     for model_id, (out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id, name) in sbml2parameters.iteritems():
         logging.info('Analysing %s...' % name)
-        S, sub_sbml, r_ids, description, mask_shift, cur_id2mask, cur_layer2mask, main_layer = \
+        S, r_id2w, sub_sbml, r_ids, description, mask_shift, cur_id2mask, cur_layer2mask, main_layer = \
             analyse_model(sbml=model_id, out_r_id=out_r_id, out_rev=out_rev, in_r_id2rev=in_r_id2rev, in_m_id=in_m_id,
                           out_m_id=out_m_id, res_dir=os.path.join(res_dir, name), do_fva=do_fva, do_fba=do_fba,
                           do_efm=do_efm, mask_shift=mask_shift, get_f_path=get_f_path, max_efm_number=max_efm_number)
@@ -222,6 +223,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         model_id2vis_r_ids[name] = r_ids
         model_id2sbml[name] = sub_sbml
         model_id2S[name] = S
+        model_id2r_id2w[name] = r_id2w
 
     if len(model_id2sbml) > 1:
         mm_dir = os.path.join(res_dir, 'merged_model')
@@ -239,7 +241,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         S = merge(S, ignore_m_ids)
         model_id2r_id_groups = get_r_id_groups(S)
         logging.info('Mapped reactions.')
-        comp_csv, m_csv, r_csv = serialize_common_metabolites_compartments_to_csv(model_id2dfs, model_id2c_id_groups,
+        comp_csv, m_csv, r_csv = serialize_common_elements_to_csv(model_id2dfs, model_id2c_id_groups,
                                                                                   model_id2m_id_groups,
                                                                                   model_id2r_id_groups,
                                                                                   os.path.join(mm_dir,
@@ -255,6 +257,10 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
 
         merged_sbml = os.path.join(res_dir, 'Merged_model.xml')
         model_id2id2id, common_ids, S = simple_merge_models(S, model_id2c_id2i, model_id2dfs, merged_sbml)
+        r_id2w = defaultdict(lambda: 1)
+        for model_id, r_id2w in model_id2r_id2w.iteritems():
+            r_id2w.update({model_id2id2id[model_id][r_id]: w for (r_id, w) in r_id2w.iteritems()
+                           if r_id in model_id2id2id[model_id]})
 
         id2mask = defaultdict(lambda: 0)
         vis_r_ids = set()
@@ -271,6 +277,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         vis_r_ids = model_id2vis_r_ids[model_id]
         id2mask = model_id2id2mask[model_id]
         id2color = None
+        r_id2w = model_id2r_id2w[model_id]
         info = ''
         S = model_id2S[model_id]
         title = 'Model analysis'
@@ -278,7 +285,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
 
     # Communities
     comm_dir = _prepare_dir(res_dir, 'communities', "Analysing communities...")
-    id2cluster = detect_fm_communities(S)
+    id2cluster = detect_fm_communities(S, r_id2w)
     id2intersection = {cl_id: S.pws.get_efm_intersection(cluster) for (cl_id, cluster) in id2cluster.iteritems()}
     id2imp_rns = {cl_id: detect_reaction_community(S, cluster, id2intersection[cl_id])
                   for (cl_id, cluster) in id2cluster.iteritems()}
