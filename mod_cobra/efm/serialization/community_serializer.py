@@ -1,3 +1,4 @@
+import logging
 import os
 
 from mod_cobra.html import describe
@@ -65,6 +66,7 @@ def serialize_community(cl_id, cluster, intersection, imp_r_id2c, model, path):
 
 
 def serialize(model, S, id2cluster, id2intersection, id2imp_rns, path, get_f_path):
+    logging.info('Serializaing reaction communities...')
     communities_txt = serialize_communities(S, id2cluster, id2intersection, id2imp_rns, path)
     limit, community_data = \
         serialize_n_longest_communities(len(id2cluster), id2cluster, id2intersection, id2imp_rns, model, path)

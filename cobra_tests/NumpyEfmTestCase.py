@@ -8,7 +8,8 @@ from cobra_tests.SBMLTestCase import create_test_sbml, TEST_SBML
 from mod_cobra.efm.numpy_efm_manager import get_element2id_mapping, model2stoichiometric_matrix, get_efm_matrix, \
     get_control_efficiency, get_yield, get_coupled_reactions, lump_coupled_reactions, get_reaction_duplicates, \
     remove_reaction_duplicates, get_efm_duplicates, remove_efm_duplicates, get_boundary_metabolites, \
-    get_efm_groups_based_on_boundary_metabolites, merge_efm_groups, get_len, remove_invalid_efms, get_efm_intersection
+    get_efm_groups_based_on_boundary_metabolites, merge_efm_groups, get_len, remove_invalid_efms, get_efm_intersection, \
+    get_support, get_2_efm_intersection
 
 __author__ = 'anna'
 
@@ -334,8 +335,8 @@ class NumpyEfmTestCase(unittest.TestCase):
                       [1, 0, 0],
                       [-1, -5, -3],
                       [0, 10, 0]])
-        r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
-        r_id2direction = get_efm_intersection(V, r_id2i)
+        i2r_id = {0: 'r1', 1: 'r2', 2: 'r3', 3: 'r4'}
+        r_id2direction = get_efm_intersection(get_support(V), i2r_id)
         size = len(r_id2direction)
         self.assertEqual(2, size, 'Intersection was supposed to have 2 reactions, got %d' % size)
 
@@ -344,8 +345,18 @@ class NumpyEfmTestCase(unittest.TestCase):
                       [1, 0, 0],
                       [-1, -5, -3],
                       [0, 10, 0]])
-        r_id2i = {'r1': 0, 'r2': 1, 'r3': 2, 'r4': 3}
-        r_id2direction = get_efm_intersection(V, r_id2i)
+        i2r_id = {0: 'r1', 1: 'r2', 2: 'r3', 3: 'r4'}
+        r_id2direction = get_efm_intersection(get_support(V), i2r_id)
+        self.assertDictEqual({'r1': 1, 'r3': -1}, r_id2direction,
+                             'Intersection was supposed to be r1, -r3 reactions, got %s' % str(r_id2direction))
+
+    def test_2_efm_intersection(self):
+        V = np.array([[1, 1, 1],
+                      [1, 0, 0],
+                      [-1, -5, -3],
+                      [0, 10, 0]])
+        i2r_id = {0: 'r1', 1: 'r2', 2: 'r3', 3: 'r4'}
+        r_id2direction = get_2_efm_intersection(get_support(V), 0, 1, i2r_id)
         self.assertDictEqual({'r1': 1, 'r3': -1}, r_id2direction,
                              'Intersection was supposed to be r1, -r3 reactions, got %s' % str(r_id2direction))
 

@@ -1,8 +1,9 @@
+import numpy
 from mod_sbml.utils.misc import invert_map
 from mod_cobra.efm.numpy_efm_manager import get_boundary_metabolites, get_coupled_reactions, lump_coupled_reactions, \
     get_reaction_duplicates, remove_reaction_duplicates, get_efm_duplicates, remove_efm_duplicates, \
     get_efm_groups_based_on_boundary_metabolites, merge_efm_groups, get_len, get_yield, get_control_efficiency, \
-    get_efm_intersection
+    get_efm_intersection, get_support, get_2_efm_intersection
 
 __author__ = 'anna'
 
@@ -29,6 +30,8 @@ class PathwaySet(object):
         self.V = V
         self.r_id2i = r_id2i
         self.efm_id2i = efm_id2i
+        self.support = None
+        self.i2r_id = None
 
     def get_coupled_reactions(self):
         return get_coupled_reactions(self.V, self.r_id2i)
@@ -47,9 +50,22 @@ class PathwaySet(object):
         v = self.V[:, self.efm_id2i[efm_id]]
         return get_control_efficiency(v, self.r_id2i[r_id])
 
+    def get_support_V(self):
+        if self.support is not None:
+            return self.support
+        return get_support(self.V)
+
+    def get_i2r_id(self):
+        if self.i2r_id is None:
+            self.i2r_id = {i: r_id for (r_id, i) in self.r_id2i.iteritems()}
+        return self.i2r_id
+
     def get_efm_intersection(self, efm_ids=None):
-        return get_efm_intersection(self.V if not efm_ids else self.V[:, [self.efm_id2i[efm_id] for efm_id in efm_ids]],
-                                    self.r_id2i)
+        V = self.get_support_V()
+        if efm_ids and len(efm_ids) == 2:
+            return get_2_efm_intersection(V, self.efm_id2i[efm_ids[0]], self.efm_id2i[efm_ids[1]], self.get_i2r_id())
+        return get_efm_intersection(V if not efm_ids else V[:, [self.efm_id2i[efm_id] for efm_id in efm_ids]],
+                                    self.get_i2r_id())
 
     def get_efm_ids_by_r_id(self, r_id):
         return [efm_id for (efm_id, i) in self.efm_id2i.iteritems() if self.V[self.r_id2i[r_id], i]]

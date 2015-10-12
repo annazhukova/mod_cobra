@@ -27,7 +27,9 @@ def detect_fm_communities(S, r_id2w):
         if w >= avg_intersection:
             g.add_edge(S.efm_id2i[fm_id_1], S.efm_id2i[fm_id_2], weight=w - avg_intersection)
 
+    logging.info("Looking for a partition...")
     partition = find_partition(graph=g, method='Modularity', weight='weight')
+    logging.info("Found a partition...")
     i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.iteritems()}
     return dict(zip(('pc_%d' % it for it in xrange(0, len(partition))),
                     ([i2efm_id[i] for i in cluster] for cluster in partition)))

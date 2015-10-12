@@ -1,4 +1,5 @@
 import os
+from mod_cobra import round_value
 
 from mod_cobra.html import describe
 from mod_cobra.efm.serialization import r_id2c_to_string, write_inputs_outputs, THIN_DELIMITER, \
@@ -26,9 +27,9 @@ def serialize_efm(S, efm_id, in_m_id, out_m_id, out_r_id, model, path):
     with open(efm_txt, 'w+') as f:
         r_id2c = S.pws.get_r_id2coeff(efm_id)
         f.write('EFM %s of length %d, of yield %g, of efficiency %g\n\n'
-                % (efm_id, len(r_id2c), S.get_yield(efm_id, in_m_id, out_m_id),
-                   S.pws.get_control_efficiency(efm_id, out_r_id)))
-        write_inputs_outputs(f, model, S.get_boundary_inputs_outputs(efm_id))
+                % (efm_id, len(r_id2c), round_value(S.get_yield(efm_id, in_m_id, out_m_id)),
+                   round_value(S.pws.get_control_efficiency(efm_id, out_r_id))))
+        write_inputs_outputs(f, model, S.get_boundary_inputs_outputs(efm_id), in_m_id)
         f.write(THIN_DELIMITER)
         write_detailed_r_id2c(model, r_id2c, f)
     return efm_txt
@@ -83,10 +84,10 @@ def serialize_efms(model, path, **kwargs):
 
 
 def write_pathway(model, pathway_id, S, S_folded, S_merged, out_m_id, in_m_id, out_r_id, get_key, f):
-    write_inputs_outputs(f, model, S_merged.get_boundary_inputs_outputs(pathway_id))
+    write_inputs_outputs(f, model, S_merged.get_boundary_inputs_outputs(pathway_id), in_m_id)
     fm_yield = S_merged.get_yield(pathway_id, in_m_id, out_m_id)
     if fm_yield is not None:
-        f.write('Yield: %g;\n\n' % fm_yield)
+        f.write('Yield: %g;\n\n' % round_value(fm_yield))
 
     if pathway_id not in S_merged.gr_id2efm_ids:
         write_folded_efm(f_efm_id=pathway_id, S=S, S_folded=S_folded, out_r_id=out_r_id, get_key=get_key, f=f)
@@ -132,7 +133,7 @@ def write_folded_efm(f_efm_id, S, S_folded, out_r_id, get_key, f, tab=''):
 def write_efm(efm_id, S, out_r_id, get_key, f, tab='', no_first_tab=False):
     f.write('%s%s of length %d of efficiency %g:\n\n%s\t%s\n\n'
             % ('' if no_first_tab else tab, efm_id, S.pws.get_len(efm_id),
-               S.pws.get_control_efficiency(efm_id, out_r_id), tab,
+               round_value(S.pws.get_control_efficiency(efm_id, out_r_id)), tab,
                r_id2c_to_string(S.pws.get_r_id2coeff(efm_id), get_key=get_key)))
 
 

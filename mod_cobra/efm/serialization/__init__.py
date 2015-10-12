@@ -65,6 +65,11 @@ def write_metabolites(m_id2st, model, f, prefix=''):
                                              for (m_id, st) in sorted(m_id2st.iteritems(), key=lambda (m_id, _): m_id))))
 
 
-def write_inputs_outputs(f, model, (r_id2st, p_id2st)):
+def write_inputs_outputs(f, model, (r_id2st, p_id2st), in_m_id=None):
+    if in_m_id and in_m_id in r_id2st:
+        c = r_id2st[in_m_id]
+        if c:
+            r_id2st = {m_id: 1.0 * st / c for (m_id, st) in r_id2st.iteritems()}
+            p_id2st = {m_id: 1.0 * st / c for (m_id, st) in p_id2st.iteritems()}
     write_metabolites(r_id2st, model, f, prefix='Inputs: ')
     write_metabolites(p_id2st, model, f, prefix='Outputs: ')

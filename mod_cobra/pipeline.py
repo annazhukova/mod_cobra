@@ -242,10 +242,8 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         model_id2r_id_groups = get_r_id_groups(S)
         logging.info('Mapped reactions.')
         comp_csv, m_csv, r_csv = serialize_common_elements_to_csv(model_id2dfs, model_id2c_id_groups,
-                                                                                  model_id2m_id_groups,
-                                                                                  model_id2r_id_groups,
-                                                                                  os.path.join(mm_dir,
-                                                                                               'Model_comparison_')) \
+                                                                  model_id2m_id_groups, model_id2r_id_groups,
+                                                                  os.path.join(mm_dir, 'Model_comparison_')) \
             if model_id2c_id_groups else (None, None, None)
         logging.info('Serialized the mappings.')
 

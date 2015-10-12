@@ -87,7 +87,7 @@ def simple_merge_models(S, model_id2c_id2group, model_id2dfs, out_sbml):
                             id_='merged_%s_%s' % (model_id, r_id)).getId()
         for model_id, r_id in it2c.iterkeys():
             model_id2id2id[model_id][r_id] = new_id
-        new_m_id2i[new_id] = S.r_id2i[gr]
+        new_r_id2i[new_id] = S.r_id2i[gr]
         common_ids.add(new_id)
 
     for ((model_id, efm_id), i) in ((it, i) for (it, i) in S.efm_id2i.iteritems() if it not in S.gr_id2efm_ids.keys()):

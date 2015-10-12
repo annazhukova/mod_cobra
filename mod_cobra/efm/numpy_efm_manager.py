@@ -173,16 +173,25 @@ def get_boundary_metabolites(N, v):
     return np.array([round_value(it) for it in ms])
 
 
-def get_efm_intersection(V, r_id2i):
-    result = {}
-    for r_id, i in r_id2i.iteritems():
-        r = V[i, :]
-        replace_zeros(r)
-        if r[r > 0].shape[0] == r.shape[0]:
-            result[r_id] = 1
-        elif r[r < 0].shape[0] == r.shape[0]:
-            result[r_id] = -1
-    return result
+def get_support(V):
+    return np.sign(V)
+
+
+def get_efm_intersection(sign_V, i2r_id):
+    result, sample_v = None, None
+    for v in sign_V.T:
+        if result is None:
+            sample_v = v
+            result = np.array(v)
+        else:
+            result[result != v] = 0
+    return {i2r_id[i]: sample_v[i] for i in np.where(result)[0] if sample_v[i]}
+
+
+def get_2_efm_intersection(sign_V, efm_i1, efm_i2, i2r_id):
+    E = sign_V.T
+    v1, v2 = E[efm_i1, :], E[efm_i2, :]
+    return {i2r_id[i]: v1[i] for i in np.where(v1 == v2)[0] if v1[i]}
 
 
 def get_efm_groups_based_on_boundary_metabolites(N, V, efm_id2i):
