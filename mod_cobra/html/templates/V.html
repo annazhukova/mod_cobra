@@ -5,11 +5,20 @@
         <table border="1">
             <tr>
                 <th></th>
-                {% for r_id in r_id2i.iterkeys() %}
-                    <th>{{r_id}}</th>
+                {% for r_id in S.r_ids %}
+                    <th {% if r_id in S.gr_id2r_id2c %} class="{{r_id}} clicable" {% endif %} >
+                        {{r_id}}
+                    </th>
+                    {% if r_id in S.gr_id2r_id2c %}
+                        {% for sub_r_id in S.gr_id2r_id2c[r_id].iterkeys() %}
+                            <th class="sub_{{r_id}}">
+                                {{sub_r_id}}
+                            </th>
+                        {% endfor %}
+                    {% endif %}
                 {% endfor %}
             </tr>
-            {% for efm_id in efm_ids %}
+            {% for efm_id in S.efm_ids %}
                 {{efm_id2tr[efm_id]}}
             {% endfor %}
         </table>
@@ -29,19 +38,36 @@
                 });
             }
         }
-        $(function() {
-            $(".subsubheader").each(function(){
-                collapse($(this), 'tr.subsubmain');
+        function collapse_col(r_id) {
+            var hiding = false;
+            $('.' + r_id).each(function(){
+                if (!$(this).hasClass('secret_col')) {
+                    $(this).addClass('secret_col');
+                    hiding = true;
+                } else {
+                    $(this).removeClass('secret_col');
+                }
             });
+            $('.sub_' + r_id).each(function(){
+                if (hiding) {
+                    $(this).addClass('secret_col');
+                    $(this).hide(100, function(){});
+                } else {
+                    $(this).removeClass('secret');
+                    $(this).show(100, function(){});
+                }
+            });
+        }
+        $(function() {
             $(".subheader").each(function(){
-                subcollapse($(this), 'tr.submain');
+                collapse($(this), 'tr.submain');
             });
             $(".header").each(function(){
                 collapse($(this), 'tr.main');
             });
-        });
-        $('.subsubheader').click(function(){
-            collapse($(this), 'tr.subsubmain');
+            {% for r_id in S.r_ids %}
+                collapse_col("{{r_id}}");
+            {% endfor %}
         });
         $('.subheader').click(function(){
             collapse($(this), 'tr.submain');
@@ -49,5 +75,10 @@
         $('.header').click(function(){
             collapse($(this), 'tr.main');
         });
+        {% for r_id in S.r_ids %}
+             $('th.{{r_id}}').click(function(){
+                 collapse_col("{{r_id}}");
+             });
+        {% endfor %}
     </script>
 </div>

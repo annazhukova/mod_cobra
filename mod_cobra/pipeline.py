@@ -164,21 +164,17 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
     S, r_id2w = None, {}
     if do_efm:
         cur_dir = _prepare_dir(res_dir, 'efma', "Performing EFMA...")
-        S_initial, S_folded, S_folded_wo_duplicates, S_merged, r_id2w = \
-            analyse_model_efm(sbml, out_r_id, out_rev, cur_dir, in_m_id, out_m_id, in_r_id2rev, tree_efm_path,
-                              threshold, max_efm_number)
-        S = S_merged
+        S, r_id2w = analyse_model_efm(sbml, out_r_id, out_rev, cur_dir, in_m_id, out_m_id, in_r_id2rev, tree_efm_path,
+                                      threshold, max_efm_number)
 
         for serializer in (efm_serializer.serialize, coupled_reaction_group_serializer.serialize):
-            description += \
-                serializer(model=model, path=cur_dir, get_f_path=get_f_path, in_m_id=in_m_id, out_m_id=out_m_id,
-                           out_r_id=out_r_id, S_initial=S_initial, S_coupled=S_folded,
-                           S_no_duplicates=S_folded_wo_duplicates, S_merged=S_merged)
+            description += serializer(model=model, path=cur_dir, get_f_path=get_f_path, in_m_id=in_m_id,
+                                      out_m_id=out_m_id, out_r_id=out_r_id, S=S)
         logging.info('Serialized EFMA')
 
-        if S_folded.gr_id2r_id2c or S_folded_wo_duplicates.gr_id2r_id2c:
+        if S.gr_id2r_id2c:
             clique_merged_sbml = os.path.join(cur_dir, 'Model_folded.xml')
-            r_id2new_r_id = create_folded_sbml(S_folded, S_folded_wo_duplicates, sbml, clique_merged_sbml)
+            r_id2new_r_id = create_folded_sbml(S, sbml, clique_merged_sbml)
             sbml = clique_merged_sbml
             doc = libsbml.SBMLReader().readSBML(sbml)
             model = doc.getModel()
@@ -188,39 +184,28 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
                 if r_id in r_id2mask:
                     r_id2mask[new_r_id] |= r_id2mask[r_id]
 
-        r_id2tooltip = {r_id: get_sbml_r_formula(model, model.getReaction(r_id), show_metabolite_ids=False)
-                        for r_id in S_merged.r_id2i.iterkeys()}
-        description += describe('S.html', S=S_merged.N, r_id2i=S_merged.r_id2i, m_id2i=S_merged.m_id2i,
-                                r_id2tooltip=r_id2tooltip,
-                                m_id2tooltip={m_id: format_m_name(model.getSpecies(m_id), model, show_id=False)
-                                              for m_id in S_merged.m_id2i.iterkeys()})
+        # r_id2tooltip = {r_id: get_sbml_r_formula(model, model.getReaction(r_id), show_metabolite_ids=False)
+        #                 for r_id in S_merged.r_id2i.iterkeys()}
+        # description += describe('S.html', S=S_merged.N, r_id2i=S_merged.r_id2i, m_id2i=S_merged.m_id2i,
+        #                         r_id2tooltip=r_id2tooltip,
+        #                         m_id2tooltip={m_id: format_m_name(model.getSpecies(m_id), model, show_id=False)
+        #                                       for m_id in S_merged.m_id2i.iterkeys()})
         efm_id2tr = {}
-        efm_id2tr.update({efm_id:
-                              describe('foldable_rows.html', V=S_folded.V,
-                                       efm_id=efm_id,
-                                       gr_id2efm_ids=S_folded.gr_id2efm_ids, header_class='subsubheader',
-                                       main_classes=['subsubmain'],
-                                       efm_id2i=S_folded.efm_id2i, r_id2i=S_folded.r_id2i, efm_id2tr=efm_id2tr)
-                          for efm_id in (efm_id for efm_id in S_folded.efm_id2i.iterkeys()
-                                         if (efm_id not in S_folded_wo_duplicates.efm_id2i)
-                                         and (efm_id not in S_merged.efm_id2i))})
-        efm_id2tr.update({efm_id:
-                              describe('foldable_rows.html', V=S_folded_wo_duplicates.V,
-                                       efm_id=efm_id,
-                                       gr_id2efm_ids=S_folded_wo_duplicates.gr_id2efm_ids, header_class='subheader',
-                                       main_classes=['subsubmain', 'submain'],
-                                       efm_id2i=S_folded_wo_duplicates.efm_id2i, r_id2i=S_folded_wo_duplicates.r_id2i,
-                                       efm_id2tr=efm_id2tr)
-                          for efm_id in (efm_id for efm_id in S_folded_wo_duplicates.efm_id2i.iterkeys()
-                                         if efm_id not in S_merged.efm_id2i)})
-        efm_id2tr.update({efm_id:
-                              describe('foldable_rows.html',  V=S_merged.V, efm_id=efm_id,
-                                       gr_id2efm_ids=S_merged.gr_id2efm_ids, header_class='header',
-                                       main_classes=['subsubmain', 'submain', 'main'],
-                                       efm_id2i=S_merged.efm_id2i, r_id2i=S_merged.r_id2i, efm_id2tr=efm_id2tr)
-                          for efm_id in S_merged.efm_id2i.iterkeys()})
-        description += describe('V.html', r_id2i=S_merged.r_id2i, efm_ids=sorted(S_merged.efm_id2i.iterkeys()),
-                                efm_id2tr=efm_id2tr, r_id2tooltip=r_id2tooltip)
+
+        def to_tr(efm_id, header_class='header', main_classes={'submain', 'main'}, main_class='main'):
+            if efm_id in efm_id2tr:
+                return
+            if efm_id in S.gr_id2efm_ids:
+                for sub_efm_id in S.gr_id2efm_ids[efm_id]:
+                    to_tr(sub_efm_id, header_class='sub%s' % header_class,
+                          main_classes=main_classes - {main_class}, main_class='sub%s' % main_class)
+            efm_id2tr[efm_id] = describe('foldable_rows.html', S=S, efm_id=efm_id, header_class=header_class,
+                                         main_classes=main_classes, efm_id2tr=efm_id2tr)
+
+        for efm_id in S.efm_ids:
+            to_tr(efm_id)
+
+        description += describe('V.html', S=S, efm_id2tr=efm_id2tr)
 
     if not opt_val and not S.efm_id2i:
         description += describe('nothing_found.html')
@@ -272,7 +257,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         model_id2c_id_groups, model_id2m_id_groups, model_id2c_id2i = map_metabolites_compartments(model_id2dfs)
         logging.info('Mapped metabolites and compartments.')
         ignore_m_ids = get_ignored_metabolites(model_id2dfs, chebi)
-        S = join(model_id2m_id_groups, model_id2S).remove_unused_metabolites()
+        S = join(model_id2m_id_groups, model_id2S)
         ignore_m_ids |= {S.m_id2gr_id[m_id] for m_id in ignore_m_ids if m_id in S.m_id2gr_id}
         S = merge(S, ignore_m_ids)
         model_id2r_id_groups = get_r_id_groups(S)
@@ -313,14 +298,14 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         id2color = None
         r_id2w = model_id2r_id2w[model_id]
         info = ''
-        S = model_id2S[model_id]
+        S = model_id2S[model_id].get_main_S()
         title = 'Model analysis'
 
 
     # Communities
     comm_dir = _prepare_dir(res_dir, 'communities', "Analysing communities...")
     id2cluster = detect_fm_communities(S, r_id2w)
-    id2intersection = {cl_id: S.pws.get_efm_intersection(cluster) for (cl_id, cluster) in id2cluster.iteritems()}
+    id2intersection = {cl_id: S.get_efm_intersection(cluster) for (cl_id, cluster) in id2cluster.iteritems()}
     id2imp_rns = {cl_id: detect_reaction_community(S, cluster, id2intersection[cl_id])
                   for (cl_id, cluster) in id2cluster.iteritems()}
     if id2cluster:

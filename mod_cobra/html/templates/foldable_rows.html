@@ -1,12 +1,21 @@
-<tr class="{% if efm_id in gr_id2efm_ids %}{{header_class}}{% endif %}
+<tr class="{% if efm_id in S.gr_id2efm_ids %}{{header_class}}{% endif %}
 {% for main_class in main_classes %} {{main_class}} {% endfor %}">
     <th>{{efm_id}}</th>
-    {% for j in r_id2i.itervalues() %}
-        <td>{% if V[efm_id2i[efm_id], j] %}{{V[efm_id2i[efm_id], j]}}{% endif %}</td>
+    {% for r_id in S.r_ids %}
+        <td {% if r_id in S.gr_id2r_id2c %} class="{{r_id}} clicable" {% endif %} >
+            {% if S.V[S.r_id2i[r_id], S.efm_id2i[efm_id]] %}{{S.V[S.r_id2i[r_id], S.efm_id2i[efm_id]]}}{% endif %}
+        </td>
+        {% if r_id in S.gr_id2r_id2c %}
+            {% for sub_r_id in S.gr_id2r_id2c[r_id].iterkeys()%}
+                <td class="sub_{{r_id}}">
+                    {% if S.V[S.r_id2i[sub_r_id], S.efm_id2i[efm_id]] %}{{S.V[S.r_id2i[sub_r_id], S.efm_id2i[efm_id]]}}{% endif %}
+                </td>
+            {% endfor %}
+        {% endif %}
     {% endfor %}
 </tr>
-{% if efm_id in gr_id2efm_ids %}
-    {% for sub_efm_id in gr_id2efm_ids[efm_id] %}
+{% if efm_id in S.gr_id2efm_ids %}
+    {% for sub_efm_id in S.gr_id2efm_ids[efm_id] %}
         {{efm_id2tr[sub_efm_id]}}
     {% endfor %}
 {% endif %}

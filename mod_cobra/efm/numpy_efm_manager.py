@@ -101,8 +101,8 @@ def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
     return N_new, V_new, new_r_id2i, r_id2lr_id, lr_id2r_id2c
 
 
-def get_reaction_duplicates(N, r_id2i, m_indices=None):
-    return get_equivalent_rows(N[m_indices, :] if m_indices else N, r_id2i, axis=1)
+def get_reaction_duplicates(N, r_id2i):
+    return get_equivalent_rows(N, r_id2i, axis=1)
 
 
 def remove_reaction_duplicates(N, V, r_id_groups, r_id2i):
@@ -163,7 +163,7 @@ def get_unique_id(efm_id2i, prefix, i):
     while efm_id in efm_id2i:
         i += 1
         efm_id = '%s_%d' % (prefix, i)
-    return efm_id, i
+    return efm_id, i + 1
 
 
 def get_boundary_metabolites(N, v):

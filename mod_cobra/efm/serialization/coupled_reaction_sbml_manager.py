@@ -6,34 +6,29 @@ from mod_sbml.sbml.submodel_manager import remove_unused_species
 __author__ = 'anna'
 
 
-def create_folded_sbml(S_coupled, S_no_duplicates, in_sbml, out_sbml):
+def create_folded_sbml(S, in_sbml, out_sbml):
     doc = libsbml.SBMLReader().readSBML(in_sbml)
     model = doc.getModel()
 
     r_id2new_r_id = {}
-    r_ids_to_remove = set()
-    for mr_id, cl_id2c in S_no_duplicates.gr_id2r_id2c.iteritems():
-        name = 'lumped reaction groups of type %s' % mr_id
+    initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
+    r_ids_to_remove = [r.getId() for r in model.getListOfReactions() if r.getId() not in S.r_ids]
+
+    def map2new_id(r_id, new_id):
+        if r_id not in S.gr_id2r_id2c:
+            r_id2new_r_id[r_id] = new_id
+        else:
+            for sub_r_id in S.gr_id2r_id2c[r_id].iterkeys():
+                map2new_id(sub_r_id, new_id)
+
+    for mr_id in S.r_ids - initial_r_ids:
+        cl_id2c = S.gr_id2r_id2c[mr_id]
+        name = 'lumped reaction %s' % mr_id
         id_ = mr_id
-        r_id2st, p_id2st = S_no_duplicates.st_matrix.get_inputs_outputs(mr_id)
-        new_r_id = create_reaction(model, r_id2st, p_id2st, reversible=False, id_=id_, name=name).getId()
-        for cl_id in cl_id2c.iterkeys():
-            for r_id in S_coupled.gr_id2r_id2c[cl_id].iterkeys() if cl_id in S_coupled.gr_id2r_id2c else [cl_id]:
-                r_id2new_r_id[r_id] = new_r_id
-                r_ids_to_remove.add(r_id)
-
-    for cl_id, r_id2c in S_coupled.gr_id2r_id2c.iteritems():
-        # If already processed in the previous block, skip.
-        if cl_id in S_no_duplicates.r_id2gr_id:
-            continue
-
-        name = 'lumped reaction group %s' % cl_id
-        id_ = cl_id
-        r_id2st, p_id2st = S_coupled.st_matrix.get_inputs_outputs(cl_id)
-        new_r_id = create_reaction(model, r_id2st, p_id2st, reversible=False, id_=id_, name=name).getId()
-        for r_id in r_id2c.iterkeys():
-            r_id2new_r_id[r_id] = new_r_id
-            r_ids_to_remove.add(r_id)
+        r_id2st, p_id2st = S.st_matrix.get_inputs_outputs(mr_id)
+        new_r_id = create_reaction(model, r_id2st, p_id2st, reversible=True, id_=id_, name=name).getId()
+        for r_id in cl_id2c:
+            map2new_id(r_id, new_r_id)
 
     for r_id in r_ids_to_remove:
         model.removeReaction(r_id)

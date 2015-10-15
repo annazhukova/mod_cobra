@@ -20,7 +20,7 @@ def detect_fm_communities(S, r_id2w):
     for fm_id_1 in fm_ids:
         for fm_id_2 in fm_ids[i:]:
             fm_id_pair2count[(fm_id_1, fm_id_2)] = \
-                sum(r_id2w[r_id] for r_id in S.pws.get_efm_intersection(efm_ids=(fm_id_1, fm_id_2)))
+                sum(r_id2w[r_id] for r_id in S.get_efm_intersection(efm_ids=(fm_id_1, fm_id_2)))
         i += 1
 
     avg_intersection = sum(fm_id_pair2count.itervalues()) / len(fm_id_pair2count)

@@ -12,7 +12,7 @@ def serialize_communities(S, id2cluster, id2intersection, id2imp_rns, path):
     comm_txt = os.path.join(path, 'Pathway_communities.txt')
     with open(comm_txt, 'w+') as f:
         f.write('Analysed %d pathways. ' % len(S.efm_id2i))
-        all_fm_intersection = S.pws.get_efm_intersection()
+        all_fm_intersection = S.get_efm_intersection()
 
         get_key = lambda r_id: (1 if r_id in all_fm_intersection else 0, (None, 0),
                                 (1 if r_id in all_fm_intersection else 0, 1), r_id)
