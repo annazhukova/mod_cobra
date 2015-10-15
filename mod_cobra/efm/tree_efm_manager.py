@@ -2,6 +2,7 @@ import logging
 import os
 
 import libsbml
+from mod_cobra.efm import coefficient_to_binary
 
 from mod_cobra import round_value, ZERO_THRESHOLD
 from mod_sbml.sbml.reaction_boundary_manager import get_bounds
@@ -65,7 +66,7 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, threshold=
     rejected_bad, rejected_different = 0, 0
 
     get_key = lambda r_id2coeff: \
-        tuple(sorted(((r_id, 1 if coeff > 0 else -1) for (r_id, coeff) in r_id2coeff.iteritems())))
+        tuple(sorted(((r_id, coefficient_to_binary(coeff)) for (r_id, coeff) in r_id2coeff.iteritems())))
     processed = set()
     with open(out_path, 'w+') as out_f:
         with open(in_path, 'r') as in_f:

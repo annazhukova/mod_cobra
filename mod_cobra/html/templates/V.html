@@ -1,0 +1,53 @@
+<div class="mediabox">
+    <h3>Pathway matrix</h3>
+
+    <div class="scrollingDiv">
+        <table border="1">
+            <tr>
+                <th></th>
+                {% for r_id in r_id2i.iterkeys() %}
+                    <th>{{r_id}}</th>
+                {% endfor %}
+            </tr>
+            {% for efm_id in efm_ids %}
+                {{efm_id2tr[efm_id]}}
+            {% endfor %}
+        </table>
+    </div>
+
+    <script type="text/javascript">
+        function collapse(it, main_selector) {
+            if (!it.hasClass('secret')) {
+                it.addClass('secret');
+                it.nextUntil(main_selector).hide(100, function(){
+                    $(this).addClass('secret');
+                });
+            } else {
+                it.removeClass('secret');
+                it.nextUntil(main_selector).show(100, function(){
+                    $(this).removeClass('secret');
+                });
+            }
+        }
+        $(function() {
+            $(".subsubheader").each(function(){
+                collapse($(this), 'tr.subsubmain');
+            });
+            $(".subheader").each(function(){
+                subcollapse($(this), 'tr.submain');
+            });
+            $(".header").each(function(){
+                collapse($(this), 'tr.main');
+            });
+        });
+        $('.subsubheader').click(function(){
+            collapse($(this), 'tr.subsubmain');
+        });
+        $('.subheader').click(function(){
+            collapse($(this), 'tr.submain');
+        });
+        $('.header').click(function(){
+            collapse($(this), 'tr.main');
+        });
+    </script>
+</div>

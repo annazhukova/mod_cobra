@@ -1,6 +1,7 @@
 from collections import defaultdict
 import numpy as np
 from scipy.sparse import csr_matrix
+from mod_cobra.efm import coefficient_to_binary
 
 from mod_cobra import ZERO_THRESHOLD, round_value
 from mod_sbml.sbml.sbml_manager import get_reactants, get_products
@@ -90,7 +91,7 @@ def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
         sample_efm_index = np.nonzero(V[sample_r_index, :])[0][0]
         sample_efm = V[:, sample_efm_index]
         c = abs(sample_efm[sample_r_index]) * 1.0
-        sign = 1 if sample_efm[sample_r_index] > 0 else -1
+        sign = coefficient_to_binary(sample_efm[sample_r_index])
         lr_id2r_id2c[lumped_r_id] = {r_id: sample_efm[r_id2i[r_id]] / c for r_id in r_ids}
         lambdas = np.array([[lr_id2r_id2c[lumped_r_id][r_id]] for r_id in r_ids])
         r_new = np.dot(N[:, tuple((r_id2i[r_id] for r_id in r_ids))], lambdas)
@@ -185,7 +186,7 @@ def get_efm_intersection(sign_V, i2r_id):
             result = np.array(v)
         else:
             result[result != v] = 0
-    return {i2r_id[i]: sample_v[i] for i in np.where(result)[0] if sample_v[i]}
+    return {i2r_id[i]: coefficient_to_binary(sample_v[i]) for i in np.where(result)[0] if sample_v[i]}
 
 
 def get_2_efm_intersection(sign_V, efm_i1, efm_i2, i2r_id):

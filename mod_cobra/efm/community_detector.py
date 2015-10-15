@@ -8,6 +8,9 @@ __author__ = 'anna'
 
 
 def detect_fm_communities(S, r_id2w):
+    if len(S.efm_id2i) == 1:
+        return {'pc_0': [next(S.efm_id2i.iterkeys())]}
+
     g = Graph(directed=False)
     g.add_vertices(len(S.efm_id2i))
 
@@ -36,6 +39,8 @@ def detect_fm_communities(S, r_id2w):
 
 
 def detect_reaction_community(S, efm_ids, selected_fm):
+    if len(efm_ids) == 1:
+        return None
 
     g = Graph(directed=False)
     # the id of the reversed version of a reaction r_id reversed would be len(S.r_id2i) + S.r_id2i[r_id]
@@ -60,9 +65,11 @@ def detect_reaction_community(S, efm_ids, selected_fm):
 
     partition = find_partition(graph=g, method='Modularity', weight='weight')
 
-    selected_fm_indices = {S.r_id2i[r_id] + (0 if coeff > 0 else len(S.r_id2i))
-                           for (r_id, coeff) in selected_fm.iteritems()}
-    cluster = next(it for it in partition if set(it) & selected_fm_indices)
+    if selected_fm:
+        selected_fm_indices = {S.r_id2i[r_id] + (0 if c > 0 else len(S.r_id2i)) for (r_id, c) in selected_fm.iteritems()}
+        cluster = next(it for it in partition if set(it) & selected_fm_indices)
+    else:
+        cluster = max(partition, key=lambda it: len(it))
     i2r_id = {i: (r_id, 1) for (r_id, i) in S.r_id2i.iteritems()}
     i2r_id.update({len(S.r_id2i) + i: (r_id, -1) for (r_id, i) in S.r_id2i.iteritems()})
     return dict(i2r_id[i] for i in cluster)

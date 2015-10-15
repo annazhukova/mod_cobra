@@ -32,10 +32,16 @@ def serialize_communities(S, id2cluster, id2intersection, id2imp_rns, path):
             imp_rns = id2imp_rns[clu_id]
             f.write('%s of %d following pathways:\n\n\t%s\n\n'
                     % (clu_id, len(cluster), ', '.join(sorted(cluster))))
-            f.write('all of which contain following reactions:\n\n\t%s\n\n'
-                    % (r_id2c_to_string(intersection, binary=True, get_key=get_key)))
-            f.write('which form a reaction community, which also contains following reactions:\n\n\t %s\n\n'
-                    % (r_id2c_to_string(imp_rns, binary=True, hidden_r_ids=hidden_r_ids)))
+            if intersection:
+                f.write('all of which contain following reactions:\n\n\t%s\n\n'
+                        % (r_id2c_to_string(intersection, binary=True, get_key=get_key)))
+            if imp_rns and imp_rns != intersection:
+                if intersection:
+                    f.write('which form a reaction community, which also contains following reactions:\n\n\t %s\n\n'
+                            % (r_id2c_to_string(imp_rns, binary=True, hidden_r_ids=hidden_r_ids)))
+                else:
+                    f.write('its largest reaction community contains following reactions:\n\n\t %s\n\n'
+                            % (r_id2c_to_string(imp_rns, binary=True, hidden_r_ids=hidden_r_ids)))
     return comm_txt
 
 
@@ -59,7 +65,10 @@ def serialize_community(cl_id, cluster, intersection, imp_r_id2c, model, path):
             write_detailed_r_id2c(model, intersection, f)
         if imp_r_id2c:
             f.write(THIN_DELIMITER)
-            f.write('Other reactions that participate in the same reaction community (%d):\n\n' % len(imp_r_id2c))
+            if intersection:
+                f.write('Other reactions that participate in the same reaction community (%d):\n\n' % len(imp_r_id2c))
+            else:
+                f.write('Reactions that participate in the largest reaction community (%d):\n\n' % len(imp_r_id2c))
             f.write(THIN_DELIMITER)
             write_detailed_r_id2c(model, imp_r_id2c, f)
     return cluster_txt

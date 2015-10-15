@@ -2,12 +2,13 @@ from collections import defaultdict
 import logging
 
 import libsbml
+from emsampler import sampler
 
-from mod_cobra.efm.System import System
+from mod_cobra.efm.System import System, FoldedSystem
 from mod_cobra import ZERO_THRESHOLD
 from mod_cobra.efm.tree_efm_manager import compute_efms
 from mod_cobra.efm.numpy_efm_manager import get_element2id_mapping, model2stoichiometric_matrix, \
-    get_efm_matrix, get_yield, get_control_efficiency, get_len
+    get_efm_matrix, get_yield, get_control_efficiency, get_len, remove_invalid_efms
 
 __author__ = 'anna'
 
@@ -19,6 +20,11 @@ def analyse_model_efm(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_
 
     system_initial = get_initial_system(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id,
                                         tree_efm_path, max_efm_number, threshold)
+    if not system_initial.efm_id2i:
+        return system_initial, FoldedSystem(st_matrix=system_initial.st_matrix, pws=system_initial.pws), \
+               FoldedSystem(st_matrix=system_initial.st_matrix, pws=system_initial.pws), \
+               FoldedSystem(st_matrix=system_initial.st_matrix, pws=system_initial.pws), defaultdict(lambda: 1)
+
     logging.info('Computed initial system')
     system_folded = system_initial.lump_coupled_reactions().remove_unused_metabolites()
     r_id2w = defaultdict(lambda: 1)
@@ -43,14 +49,15 @@ def get_initial_system(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_
     r_id2coefficient_list = compute_efms(sbml, res_dir, max_efm_number, out_r_id, out_rev, r_id2rev=in_r_id2rev,
                                          tree_efm_path=tree_efm_path, threshold=threshold)
     V = get_efm_matrix(r_id2coefficient_list, r_id2i)
+    # inner_m_ids = [m.getId() for m in model.getListOfSpecies() if not m.getBoundaryCondition()]
     # rev = [model.getReaction(r_id).getReversible() for (r_id, i) in
     #        sorted(r_id2i.iteritems(), key=lambda (_, i): i)]
-    # V = sampler(N_int, rev, K=max_efm_number, debug=False)
+    # N_in = N[[m_id2i[m_id] for m_id in inner_m_ids], :]
+    # V = sampler(N_in, rev, K=None, debug=True)
     # V = V[:, [i for i in xrange(0, V.shape[1])
     #           if V[r_id2i[out_r_id], i] * (-1 if out_rev else 1) > 0 and
     #           next((False for (in_r_id, in_rev) in in_r_id2rev.iteritems() if
     #                 V[r_id2i[in_r_id], i] * (-1 if in_rev else 1) <= 0), True)]]
-    # inner_m_ids = [m.getId() for m in model.getListOfSpecies() if not m.getBoundaryCondition()]
     # V = remove_invalid_efms(N[tuple(m_id2i[m_id] for m_id in inner_m_ids), :], V)
     logging.info('Calculated V of shape %s' % 'x'.join((str(it) for it in V.shape)))
     v_yield = lambda v_i: -get_yield(N, V[:, v_i], m_id2i[out_m_id], m_id2i[in_m_id]) \

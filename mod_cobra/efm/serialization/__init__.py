@@ -8,10 +8,6 @@ THIN_DELIMITER = '------------------------------------------\n\n'
 TINY_DELIMITER = '-------------\n\n'
 
 
-def coefficient_to_binary(c):
-    return 1 if c > 0 else -1
-
-
 def coefficient_to_string(c, binary=False):
     if binary or abs(c) == 1:
         return '' if c > 0 else '-'

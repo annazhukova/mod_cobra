@@ -23,7 +23,7 @@ def map_comps(model_id2dfs):
                 key2comp[key][model_id].add(c_id)
     if GO_CYTOPLASM in key2comp and GO_CYTOSOL in key2comp \
             and not set(it[0] for it in key2comp[GO_CYTOSOL]) & set(it[0] for it in key2comp[GO_CYTOPLASM]):
-        key2comp[GO_CYTOPLASM] |= key2comp[GO_CYTOSOL]
+        key2comp[GO_CYTOPLASM].update(key2comp[GO_CYTOSOL])
         del key2comp[GO_CYTOSOL]
     return [comps for comps in key2comp.itervalues() if len(comps) > 1]
 
@@ -32,7 +32,8 @@ def map_metabolites(model_id2dfs):
     key2ms = defaultdict(lambda: defaultdict(set))
     for model_id, [df, _, _] in model_id2dfs.iteritems():
         for index, row in df.iterrows():
-            m_id, name, formula, kegg, chebi = row['Id'], row['Name'], row['Formula'], row['KEGG'], row["ChEBI"]
+            m_id, name, formula, kegg = row['Id'], row['Name'], row['Formula'], row['KEGG']
+            chebi = row["ChEBI"] if 'ChEBI' in row else None
             key = chebi if chebi else (kegg if kegg else (formula if formula else name))
             key = key.strip().lower() if key else None
             if key:

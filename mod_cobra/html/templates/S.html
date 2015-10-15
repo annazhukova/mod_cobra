@@ -1,0 +1,31 @@
+<div class="mediabox">
+    <h3>Stoichiometric matrix</h3>
+
+    <div class="scrollingDiv">
+        <table border="1">
+            <tr>
+                <th></th>
+                {% for r_id in r_id2i.iterkeys() %}
+                    <th title="{{r_id2tooltip[r_id]}}">{{r_id}}</th>
+                {% endfor %}
+            </tr>
+            {% for (m_id, i) in m_id2i.iteritems() %}
+                <tr>
+                    <th title="{{m_id2tooltip[m_id]}}">{{m_id}}</th>
+                    {% for j in r_id2i.itervalues() %}
+                        <td>{% if S[i, j] %}{{S[i, j]}}{% endif %}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!--<script type="text/javascript">-->
+        <!--$('.header').click(function(){-->
+            <!--$(this).find('span').text(function(_, value){-->
+                <!--return value == '-' ? '+': '-';-->
+            <!--});-->
+            <!--$(this).nextUntil('tr.header').slideToggle(100, function(){});-->
+        <!--});-->
+    <!--</script>-->
+</div>

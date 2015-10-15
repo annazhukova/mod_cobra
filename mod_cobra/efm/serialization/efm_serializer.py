@@ -90,7 +90,8 @@ def write_pathway(model, pathway_id, S, S_folded, S_merged, out_m_id, in_m_id, o
         f.write('Yield: %g;\n\n' % round_value(fm_yield))
 
     if pathway_id not in S_merged.gr_id2efm_ids:
-        write_folded_efm(f_efm_id=pathway_id, S=S, S_folded=S_folded, out_r_id=out_r_id, get_key=get_key, f=f)
+        write_folded_efm(f_efm_id=pathway_id, S=S, S_folded=S_folded, out_r_id=out_r_id, in_m_id=in_m_id,
+                         out_m_id=out_m_id, get_key=get_key, f=f)
         return
 
     f.write('%s of length %d:\n\n\t%s\n\n'
@@ -104,13 +105,14 @@ def write_pathway(model, pathway_id, S, S_folded, S_merged, out_m_id, in_m_id, o
             f.write('\t\t%s' % THIN_DELIMITER)
         else:
             started = True
-        write_folded_efm(f_efm_id=f_efm_id, S=S, S_folded=S_folded,
-                         out_r_id=out_r_id, get_key=get_key, f=f, tab='\t\t')
+        write_folded_efm(f_efm_id=f_efm_id, S=S, S_folded=S_folded, out_r_id=out_r_id, in_m_id=in_m_id,
+                         out_m_id=out_m_id, get_key=get_key, f=f, tab='\t\t')
 
 
-def write_folded_efm(f_efm_id, S, S_folded, out_r_id, get_key, f, tab=''):
+def write_folded_efm(f_efm_id, S, S_folded, out_r_id, in_m_id, out_m_id, get_key, f, tab=''):
     if f_efm_id not in S_folded.gr_id2efm_ids:
-        write_efm(efm_id=f_efm_id, S=S, out_r_id=out_r_id, get_key=get_key, f=f, tab=tab)
+        write_efm(efm_id=f_efm_id, S=S, out_r_id=out_r_id, in_m_id=in_m_id, out_m_id=out_m_id, get_key=get_key, f=f,
+                  tab=tab)
         return
 
     f.write('%s%s of length %d:\n\n%s\t%s\n\n'
@@ -126,14 +128,15 @@ def write_folded_efm(f_efm_id, S, S_folded, out_r_id, get_key, f, tab=''):
             f.write('%s\t\t%s' % (tab, TINY_DELIMITER))
         else:
             started = True
-        write_efm(efm_id=efm_id, S=S, out_r_id=out_r_id, get_key=get_key, f=f, tab='%s\t\t' % tab,
-                  no_first_tab=len(efm_ids) == 1)
+        write_efm(efm_id=efm_id, S=S, out_r_id=out_r_id, in_m_id=in_m_id, out_m_id=out_m_id, get_key=get_key, f=f,
+                  tab='%s\t\t' % tab, no_first_tab=len(efm_ids) == 1)
 
 
-def write_efm(efm_id, S, out_r_id, get_key, f, tab='', no_first_tab=False):
-    f.write('%s%s of length %d of efficiency %g:\n\n%s\t%s\n\n'
+def write_efm(efm_id, S, out_r_id, in_m_id, out_m_id, get_key, f, tab='', no_first_tab=False):
+    f.write('%s%s of length %d, of efficiency %g, of yield %g:\n\n%s\t%s\n\n'
             % ('' if no_first_tab else tab, efm_id, S.pws.get_len(efm_id),
-               round_value(S.pws.get_control_efficiency(efm_id, out_r_id)), tab,
+               round_value(S.pws.get_control_efficiency(efm_id, out_r_id)),
+               round_value(S.get_yield(efm_id, in_m_id, out_m_id)), tab,
                r_id2c_to_string(S.pws.get_r_id2coeff(efm_id), get_key=get_key)))
 
 

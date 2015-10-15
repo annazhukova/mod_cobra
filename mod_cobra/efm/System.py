@@ -1,4 +1,4 @@
-import numpy
+from mod_cobra.efm import coefficient_to_binary
 from mod_sbml.utils.misc import invert_map
 from mod_cobra.efm.numpy_efm_manager import get_boundary_metabolites, get_coupled_reactions, lump_coupled_reactions, \
     get_reaction_duplicates, remove_reaction_duplicates, get_efm_duplicates, remove_efm_duplicates, \
@@ -39,7 +39,10 @@ class PathwaySet(object):
     def get_efm_duplicates(self):
         return get_efm_duplicates(self.V, self.efm_id2i)
 
-    def get_r_id2coeff(self, efm_id):
+    def get_r_id2coeff(self, efm_id, binary=False):
+        if binary:
+            return {r_id: coefficient_to_binary(self.V[i, self.efm_id2i[efm_id]]) for (r_id, i) in self.r_id2i.iteritems()
+                    if self.V[i, self.efm_id2i[efm_id]]}
         return {r_id: self.V[i, self.efm_id2i[efm_id]] for (r_id, i) in self.r_id2i.iteritems()
                 if self.V[i, self.efm_id2i[efm_id]]}
 
@@ -62,6 +65,8 @@ class PathwaySet(object):
 
     def get_efm_intersection(self, efm_ids=None):
         V = self.get_support_V()
+        if efm_ids and len(efm_ids) == 1:
+            return self.get_r_id2coeff(next(iter(efm_ids)))
         if efm_ids and len(efm_ids) == 2:
             return get_2_efm_intersection(V, self.efm_id2i[efm_ids[0]], self.efm_id2i[efm_ids[1]], self.get_i2r_id())
         return get_efm_intersection(V if not efm_ids else V[:, [self.efm_id2i[efm_id] for efm_id in efm_ids]],
@@ -80,7 +85,7 @@ class System(object):
         if N is not None and m_id2i and r_id2i:
             self.st_matrix = StoichiometricMatrix(N, m_id2i, r_id2i, boundary_m_ids)
         self.pws = pws
-        if V is not None and r_id2i and efm_id2i:
+        if V is not None and r_id2i:
             self.pws = PathwaySet(V, r_id2i, efm_id2i)
 
     @property
@@ -142,8 +147,8 @@ class FoldedSystem(System):
                  N=None, V=None, m_id2i=None, r_id2i=None, efm_id2i=None, boundary_m_ids=None):
         System.__init__(self, st_matrix=st_matrix, pws=pws, N=N, V=V, m_id2i=m_id2i, r_id2i=r_id2i, efm_id2i=efm_id2i,
                         boundary_m_ids=boundary_m_ids)
-        self.r_id2gr_id = r_id2gr_id
-        self.gr_id2r_id2c = gr_id2r_id2c
+        self.r_id2gr_id = r_id2gr_id if r_id2gr_id else {}
+        self.gr_id2r_id2c = gr_id2r_id2c if gr_id2r_id2c else {}
         self.efm_id2gr_id = efm_id2gr_id if efm_id2gr_id else {}
         self.gr_id2efm_ids = invert_map(self.efm_id2gr_id)
         self.m_id2gr_id = m_id2gr_id if m_id2gr_id else {}

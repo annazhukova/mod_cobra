@@ -28,7 +28,7 @@ from sbml_vis.mimoza_pipeline import process_sbml
 from mod_cobra.fbva.fbva_analyser import analyse_by_fba, analyse_by_fva
 from mod_cobra.fbva.serialization.fbva_sbml_manager import create_fva_model
 from mod_sbml.utils.path_manager import create_dirs
-from mod_sbml.serialization import get_sbml_r_formula
+from mod_sbml.serialization import get_sbml_r_formula, format_m_name
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
 from mod_cobra.efm.serialization import coupled_reaction_group_serializer, community_serializer, efm_serializer
@@ -88,13 +88,13 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
     if not get_f_path:
         get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
 
-    if in_r_id2rev:
-        logging.info("Constraining input reactions...")
-        doc = libsbml.SBMLReader().readSBML(sbml)
-        model = doc.getModel()
-        constraint_exchange_reactions(model, allowed_exchange_r_id2rev=in_r_id2rev, cofactors=cofactors)
-        sbml = os.path.join(res_dir, '%s_constrained.xml' % os.path.splitext(os.path.basename(sbml))[0])
-        libsbml.SBMLWriter().writeSBMLToFile(doc, sbml)
+    # if in_r_id2rev:
+    #     logging.info("Constraining input reactions...")
+    #     doc = libsbml.SBMLReader().readSBML(sbml)
+    #     model = doc.getModel()
+    #     constraint_exchange_reactions(model, allowed_exchange_r_id2rev=in_r_id2rev, cofactors=cofactors)
+    #     sbml = os.path.join(res_dir, '%s_constrained.xml' % os.path.splitext(os.path.basename(sbml))[0])
+    #     libsbml.SBMLWriter().writeSBMLToFile(doc, sbml)
 
     # copy our model in the result directory
     if os.path.normpath(res_dir) != os.path.normpath(os.path.dirname(sbml)):
@@ -180,11 +180,47 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
             clique_merged_sbml = os.path.join(cur_dir, 'Model_folded.xml')
             r_id2new_r_id = create_folded_sbml(S_folded, S_folded_wo_duplicates, sbml, clique_merged_sbml)
             sbml = clique_merged_sbml
+            doc = libsbml.SBMLReader().readSBML(sbml)
+            model = doc.getModel()
 
             vis_r_ids |= {cl_id for (r_id, cl_id) in r_id2new_r_id.iteritems() if r_id in vis_r_ids}
             for r_id, new_r_id in r_id2new_r_id.iteritems():
                 if r_id in r_id2mask:
                     r_id2mask[new_r_id] |= r_id2mask[r_id]
+
+        r_id2tooltip = {r_id: get_sbml_r_formula(model, model.getReaction(r_id), show_metabolite_ids=False)
+                        for r_id in S_merged.r_id2i.iterkeys()}
+        description += describe('S.html', S=S_merged.N, r_id2i=S_merged.r_id2i, m_id2i=S_merged.m_id2i,
+                                r_id2tooltip=r_id2tooltip,
+                                m_id2tooltip={m_id: format_m_name(model.getSpecies(m_id), model, show_id=False)
+                                              for m_id in S_merged.m_id2i.iterkeys()})
+        efm_id2tr = {}
+        efm_id2tr.update({efm_id:
+                              describe('foldable_rows.html', V=S_folded.V,
+                                       efm_id=efm_id,
+                                       gr_id2efm_ids=S_folded.gr_id2efm_ids, header_class='subsubheader',
+                                       main_classes=['subsubmain'],
+                                       efm_id2i=S_folded.efm_id2i, r_id2i=S_folded.r_id2i, efm_id2tr=efm_id2tr)
+                          for efm_id in (efm_id for efm_id in S_folded.efm_id2i.iterkeys()
+                                         if (efm_id not in S_folded_wo_duplicates.efm_id2i)
+                                         and (efm_id not in S_merged.efm_id2i))})
+        efm_id2tr.update({efm_id:
+                              describe('foldable_rows.html', V=S_folded_wo_duplicates.V,
+                                       efm_id=efm_id,
+                                       gr_id2efm_ids=S_folded_wo_duplicates.gr_id2efm_ids, header_class='subheader',
+                                       main_classes=['subsubmain', 'submain'],
+                                       efm_id2i=S_folded_wo_duplicates.efm_id2i, r_id2i=S_folded_wo_duplicates.r_id2i,
+                                       efm_id2tr=efm_id2tr)
+                          for efm_id in (efm_id for efm_id in S_folded_wo_duplicates.efm_id2i.iterkeys()
+                                         if efm_id not in S_merged.efm_id2i)})
+        efm_id2tr.update({efm_id:
+                              describe('foldable_rows.html',  V=S_merged.V, efm_id=efm_id,
+                                       gr_id2efm_ids=S_merged.gr_id2efm_ids, header_class='header',
+                                       main_classes=['subsubmain', 'submain', 'main'],
+                                       efm_id2i=S_merged.efm_id2i, r_id2i=S_merged.r_id2i, efm_id2tr=efm_id2tr)
+                          for efm_id in S_merged.efm_id2i.iterkeys()})
+        description += describe('V.html', r_id2i=S_merged.r_id2i, efm_ids=sorted(S_merged.efm_id2i.iterkeys()),
+                                efm_id2tr=efm_id2tr, r_id2tooltip=r_id2tooltip)
 
     if not opt_val and not S.efm_id2i:
         description += describe('nothing_found.html')
@@ -337,7 +373,8 @@ def get_ignored_metabolites(model_id2dfs, chebi):
     ignore_m_ids = set()
     for model_id, [df, _, _] in model_id2dfs.iteritems():
         for index, row in df.iterrows():
-            m_id, t_id = row['Id'], row["ChEBI"]
+            m_id = row['Id']
+            t_id = row["ChEBI"] if 'ChEBI' in row else None
             if t_id in ignore_ch_ids:
                 ignore_m_ids.add((model_id, m_id))
     return ignore_m_ids
