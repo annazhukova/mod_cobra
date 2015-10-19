@@ -70,7 +70,7 @@ class System(object):
         self.r_id2gr_id = r_id2gr_id if r_id2gr_id else {}
         self.gr_id2r_id2c = gr_id2r_id2c if gr_id2r_id2c else {}
         self.efm_id2gr_id = efm_id2gr_id if efm_id2gr_id else {}
-        self.gr_id2efm_ids = invert_map(self.efm_id2gr_id)
+        self.gr_id2efm_ids = invert_map(self.efm_id2gr_id, list)
         self.m_id2gr_id = m_id2gr_id if m_id2gr_id else {}
 
         self.coupled_rs = set()
@@ -143,15 +143,15 @@ class System(object):
         b_ms = get_boundary_metabolites(self.N[[self.m_id2i[m_id] for m_id in bm_ids], :][:, r_is], v)
         bm_id2i = dict(zip(bm_ids, xrange(0, len(bm_ids))))
         # b_ms = get_boundary_metabolites(self.N, v)
-        r_id2st = {m_id: -b_ms[bm_id2i[m_id]] for m_id in self.boundary_m_ids if b_ms[bm_id2i[m_id]] < 0}
-        p_id2st = {m_id: b_ms[bm_id2i[m_id]] for m_id in self.boundary_m_ids if b_ms[bm_id2i[m_id]] > 0}
+        r_id2st = {m_id: -b_ms[bm_id2i[m_id]] for m_id in bm_ids if b_ms[bm_id2i[m_id]] < 0}
+        p_id2st = {m_id: b_ms[bm_id2i[m_id]] for m_id in bm_ids if b_ms[bm_id2i[m_id]] > 0}
         return r_id2st, p_id2st
 
     def lump_coupled_reactions(self):
         coupled_r_id_groups = get_coupled_reactions(self.V, self.r_id2i)
         lr_i = 0
         for r_ids in coupled_r_id_groups:
-            lumped_r_id, lr_i = get_unique_id(self.r_id2i, 'r_group', lr_i)
+            lumped_r_id, lr_i = get_unique_id(self.r_id2i, 'coupled_r', lr_i)
             self.coupled_rs.add(lumped_r_id)
             self.r_id2gr_id.update({r_id: lumped_r_id for r_id in r_ids})
             self.r_id2i[lumped_r_id] = self.V.shape[0]
@@ -185,7 +185,7 @@ class System(object):
             grouped_efm_id, gr_i = get_unique_id(self.efm_id2i, 'pathway', gr_i)
             self.pathways.add(grouped_efm_id)
             self.efm_id2gr_id.update({efm_id: grouped_efm_id for efm_id in efm_ids})
-            self.gr_id2efm_ids[grouped_efm_id] = set(efm_ids)
+            self.gr_id2efm_ids[grouped_efm_id] = efm_ids
             self.efm_id2i[grouped_efm_id] = self.V.shape[1]
 
             indices = tuple((self.efm_id2i[efm_id] for efm_id in efm_ids))
@@ -204,10 +204,10 @@ class System(object):
 
         gr_i = 0
         for efm_ids in efm_id_groups:
-            grouped_efm_id, gr_i = get_unique_id(self.efm_id2i, 'folded_efm', gr_i)
+            grouped_efm_id, gr_i = get_unique_id(self.efm_id2i, 'efm_type', gr_i)
             self.folded_efms.add(grouped_efm_id)
             self.efm_id2gr_id.update({efm_id: grouped_efm_id for efm_id in efm_ids})
-            self.gr_id2efm_ids[grouped_efm_id] = set(efm_ids)
+            self.gr_id2efm_ids[grouped_efm_id] = efm_ids
             self.efm_id2i[grouped_efm_id] = self.V.shape[1]
 
             sample_efm_index = self.efm_id2i[efm_ids[0]]
@@ -247,6 +247,17 @@ class System(object):
     def remove_unused_metabolites(self):
         self.m_ids = {m_id for (m_id, i) in self.m_id2i.iteritems()
                       if get_len(self.N[i, [self.r_id2i[r_id] for r_id in self.r_ids]])}
+
+    def get_used_system(self):
+        m_ids = {m_id for (m_id, i) in self.m_id2i.iteritems() if get_len(self.N[i, :])}
+        r_ids = {r_id for (r_id, i) in self.r_id2i.iteritems() if get_len(self.V[i, :])}
+        r_id2i = {r_id: i for (i, r_id) in enumerate(r_ids)}
+        m_id2i = {m_id: i for (i, m_id) in enumerate(m_ids)}
+        efm_id2i = self.efm_id2i
+        V = self.get_main_V(r_id2i=r_id2i, efm_id2i=efm_id2i)
+        N = self.get_main_N(r_id2i=r_id2i, m_id2i=m_id2i)
+        return System(N=N, V=V, r_id2i=r_id2i, m_id2i=m_id2i, efm_id2i=efm_id2i,
+                      boundary_m_ids=sorted(set(self.boundary_m_ids) & m_ids))
 
     def get_main_m_id2i(self, ignored_m_ids=None, boundary=False):
         m_ids = set(self.m_ids)

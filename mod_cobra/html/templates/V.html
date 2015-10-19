@@ -1,84 +1,108 @@
-<div class="mediabox">
-    <h3>Pathway matrix</h3>
+<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=10; IE=9; IE=8; IE=7; IE=EDGE,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <div class="scrollingDiv">
-        <table border="1">
-            <tr>
-                <th></th>
-                {% for r_id in S.r_ids %}
-                    <th {% if r_id in S.gr_id2r_id2c %} class="{{r_id}} clicable" {% endif %} >
-                        {{r_id}}
-                    </th>
-                    {% if r_id in S.gr_id2r_id2c %}
-                        {% for sub_r_id in S.gr_id2r_id2c[r_id].iterkeys() %}
-                            <th class="sub_{{r_id}}">
-                                {{sub_r_id}}
-                            </th>
+    <link media="all" href="lib/modelmap/modelmap.min.css" type="text/css" rel="stylesheet" />
+    <link media="all" href="lib/modelmap/table.min.css" type="text/css" rel="stylesheet" />
+    <link media="all" href="lib/jquery/jquery-ui.min.css" type="text/css" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="lib/FullWidthTabs/component.min.css" />
+    <link rel="stylesheet" type="text/css" href="lib/FullWidthTabs/demo.min.css" />
+
+    <link href="lib/modelmap/fav.ico" type="image/x-icon" rel="shortcut icon" />
+
+    <title>Pathways in {{model_name}}</title>
+
+    <script src="lib/jquery/jquery-2.1.4.min.js" type="text/javascript"></script>
+    <script src="lib/jquery/jquery-ui.min.js" type="text/javascript"></script>
+    <!--[if IE]>
+    <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+</head>
+<body>
+    <div class="container">
+        <header class="clearfix">
+            <h2 class="centre">Pathways in {{model_name}}</h2>
+        </header>
+        <div class="indent centre">
+            <div id='V_div' class="scrollingDiv full_width">
+            <table border="1" id='V'>
+                <thead>
+                    <tr>
+                        <th class="white"></th>
+                        {% for r_id in S.r_ids %}
+                            <th  class="{% if r_id in S.gr_id2r_id2c %}secret {{r_id}} clicable{% else %}white{% endif %}"  title="{{r_id2tooltip[r_id]}}">{{r_id}}</th>
+                            {% if r_id in S.gr_id2r_id2c %}
+                                {% for sub_r_id in S.gr_id2r_id2c[r_id].iterkeys() %}
+                                    <th class="{{sub_r_id}} hidden sub_r sub_{{r_id}}{% if sub_r_id in S.gr_id2r_id2c %} secret subclicable{% endif %}"
+                                        title="{{r_id2tooltip[sub_r_id]}}">{{sub_r_id}}</th>
+                                    {% if sub_r_id in S.gr_id2r_id2c %}
+                                        {% for sub_sub_r_id in S.gr_id2r_id2c[sub_r_id].iterkeys()%}
+                                            <th class="{{sub_sub_r_id}} hidden sub_sub_r sub_r sub_{{sub_r_id}}"
+                                                title="{{r_id2tooltip[sub_sub_r_id]}}">{{sub_sub_r_id}}</th>
+                                        {% endfor %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
                         {% endfor %}
-                    {% endif %}
-                {% endfor %}
-            </tr>
-            {% for efm_id in S.efm_ids %}
-                {{efm_id2tr[efm_id]}}
-            {% endfor %}
-        </table>
-    </div>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for efm_id in S.efm_ids %}
+                        {{efm_id2tr[efm_id]}}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        </div>
 
-    <script type="text/javascript">
-        function collapse(it, main_selector) {
-            if (!it.hasClass('secret')) {
-                it.addClass('secret');
-                it.nextUntil(main_selector).hide(100, function(){
-                    $(this).addClass('secret');
+        <script type="text/javascript">
+            $(function() {
+                $('#V_div').css('max-height', $(window).height * 0.85);
+            });
+
+            function collapse(element_id, sub_element_ids) {
+                var hiding = false;
+                $('.' + element_id).each(function(){
+                    if (!$(this).hasClass('secret')) {
+                        $(this).addClass('secret');
+                        hiding = true;
+                    } else {
+                        $(this).removeClass('secret');
+                    }
                 });
-            } else {
-                it.removeClass('secret');
-                it.nextUntil(main_selector).show(100, function(){
-                    $(this).removeClass('secret');
-                });
+                for (var i = 0; i < sub_element_ids.length; i++) {
+                    sub_r_id = sub_element_ids[i];
+                    $('.' + sub_r_id).each(function () {
+                        if (hiding) {
+                            $(this).addClass('hidden');
+                            $('.sub_' + sub_r_id).each(function () {
+                                $(this).addClass('hidden');
+                            });
+                        } else {
+                            $(this).removeClass('hidden');
+                            if (!$(this).hasClass('secret')) {
+                                $('.sub_' + sub_r_id).each(function () {
+                                    $(this).removeClass('hidden');
+                                });
+                            }
+                        }
+                    });
+                }
             }
-        }
-        function collapse_col(r_id) {
-            var hiding = false;
-            $('.' + r_id).each(function(){
-                if (!$(this).hasClass('secret_col')) {
-                    $(this).addClass('secret_col');
-                    hiding = true;
-                } else {
-                    $(this).removeClass('secret_col');
-                }
-            });
-            $('.sub_' + r_id).each(function(){
-                if (hiding) {
-                    $(this).addClass('secret_col');
-                    $(this).hide(100, function(){});
-                } else {
-                    $(this).removeClass('secret');
-                    $(this).show(100, function(){});
-                }
-            });
-        }
-        $(function() {
-            $(".subheader").each(function(){
-                collapse($(this), 'tr.submain');
-            });
-            $(".header").each(function(){
-                collapse($(this), 'tr.main');
-            });
-            {% for r_id in S.r_ids %}
-                collapse_col("{{r_id}}");
+            {% for r_id in S.gr_id2r_id2c.iterkeys() %}
+                 $('th.{{r_id}}').click(function(){
+                     collapse("{{r_id}}", {{S.gr_id2r_id2c[r_id].keys()}});
+                 });
             {% endfor %}
-        });
-        $('.subheader').click(function(){
-            collapse($(this), 'tr.submain');
-        });
-        $('.header').click(function(){
-            collapse($(this), 'tr.main');
-        });
-        {% for r_id in S.r_ids %}
-             $('th.{{r_id}}').click(function(){
-                 collapse_col("{{r_id}}");
-             });
-        {% endfor %}
-    </script>
-</div>
+            {% for efm_id in S.gr_id2efm_ids.iterkeys() %}
+                 $('tr.{{efm_id}}').click(function(){
+                     collapse("{{efm_id}}", {{S.gr_id2efm_ids[efm_id]}});
+                 });
+            {% endfor %}
+        </script>
+    </div>
+</body>
+</html>

@@ -2,7 +2,6 @@ from collections import defaultdict
 import logging
 
 import libsbml
-from emsampler import sampler
 
 from mod_cobra.efm.System import System
 from mod_cobra import ZERO_THRESHOLD
@@ -67,4 +66,4 @@ def get_initial_system(sbml, model, res_dir, out_r_id, out_rev, in_r_id2rev, in_
     efm_id2i = dict(zip(('efm_%d' % it for it in xrange(0, len(i2efficiency))),
                         sorted(i2efficiency.iterkeys(), key=lambda i: i2efficiency[i])))
     return System(N=N, V=V, m_id2i=m_id2i, r_id2i=r_id2i, efm_id2i=efm_id2i,
-                  boundary_m_ids=boundary_m_ids)
+                  boundary_m_ids=boundary_m_ids).get_used_system()

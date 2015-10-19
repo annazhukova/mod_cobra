@@ -4,18 +4,14 @@ from mod_cobra import round_value
 from mod_cobra.html import describe
 from mod_cobra.efm.serialization import r_id2c_to_string, write_inputs_outputs, THIN_DELIMITER, \
     THICK_DELIMITER, TINY_DELIMITER, write_detailed_r_id2c
+from mod_cobra.efm.serialization import pathway_matrix_serializer
 
 __author__ = 'anna'
 
 
-def serialize_n_most_efficient_efms(model, path, **kwargs):
-    S = kwargs['S']
+def serialize_n_most_efficient_efms(model, path, S, out_m_id, in_m_id, out_r_id, n=3):
     initial_efm_ids = {efm_id for efm_id in S.efm_id2i.iterkeys() if efm_id not in S.gr_id2efm_ids}
     initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
-    out_r_id = kwargs['out_r_id']
-    in_m_id = kwargs['in_m_id']
-    out_m_id = kwargs['out_m_id']
-    n = kwargs['n'] if 'n' in kwargs else 3
     limit = min(n if n is not None and n >= 0 else len(S.efm_id2i), len(S.efm_id2i))
     efm_data = [(efm_id, S.get_len(efm_id, r_ids=initial_r_ids),
                  serialize_efm(S, efm_id, in_m_id, out_m_id, out_r_id, model, path))
@@ -39,10 +35,7 @@ def serialize_efm(S, efm_id, in_m_id, out_m_id, out_r_id, model, path):
     return efm_txt
 
 
-def serialize_efms(model, path, **kwargs):
-    S = kwargs['S']
-    out_m_id, in_m_id, out_r_id = kwargs['out_m_id'], kwargs['in_m_id'], kwargs['out_r_id']
-
+def serialize_efms(model, path, S, out_m_id, in_m_id, out_r_id):
     initial_efm_ids = {efm_id for efm_id in S.efm_id2i.iterkeys() if efm_id not in S.gr_id2efm_ids}
     initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
     all_fm_intersection = S.get_efm_intersection(initial_efm_ids, r_ids=initial_r_ids)
@@ -117,7 +110,7 @@ def write_folded_efm(f_efm_id, S, out_r_id, in_m_id, out_m_id, get_key, f, tab='
                r_id2c_to_string(S.pws.get_r_id2coeff(f_efm_id, r_ids=S.r_ids), get_key=get_key)))
 
     efm_ids = S.gr_id2efm_ids[f_efm_id]
-    f.write('%s\tUnfolds into %s' % (tab, ('the following %d EFMs:\n\n' % len(efm_ids)) if len(efm_ids) != 1 else ''))
+    f.write('%s\tContains %s' % (tab, ('the following %d EFMs:\n\n' % len(efm_ids)) if len(efm_ids) != 1 else ''))
 
     started = False
     for efm_id in efm_ids:
@@ -139,11 +132,14 @@ def write_efm(efm_id, S, out_r_id, in_m_id, out_m_id, get_key, f, tab='', no_fir
 
 
 def serialize(model, path, get_f_path, **kwargs):
-    pathways_txt, (efm_num, pw_num) = serialize_efms(model, path, **kwargs)
-    limit, efm_data = serialize_n_most_efficient_efms(model, path, n=3, **kwargs)
+    out_m_id, in_m_id, out_r_id, model_name, main_dir, S = kwargs['out_m_id'], kwargs['in_m_id'], kwargs['out_r_id'], \
+                                                           kwargs['model_name'], kwargs['main_dir'], kwargs['S']
+    pathways_txt, (efm_num, pw_num) = serialize_efms(model, path, S, out_m_id, in_m_id, out_r_id)
+    limit, efm_data = serialize_n_most_efficient_efms(model, path, S, out_m_id, in_m_id, out_r_id, n=3)
     fm_block = describe('fm_block.html', element_num=limit, characteristics='most effective',
                         element_name='EFM',
                         fms=[(efm_id, efm_len, get_f_path(efm_txt)) for (efm_id, efm_len, efm_txt) in efm_data],
                         all=limit == efm_num)
+    pw_matrix_html = pathway_matrix_serializer.serialize(S, model, in_m_id, out_m_id, model_name, main_dir)
     return describe('efms.html', efm_num=efm_num, fm_num=pw_num, description_filepath=get_f_path(pathways_txt),
-                    selected_efm_block=fm_block)
+                    selected_efm_block=fm_block, pw_matrix_html=pw_matrix_html)

@@ -28,7 +28,7 @@ from sbml_vis.mimoza_pipeline import process_sbml
 from mod_cobra.fbva.fbva_analyser import analyse_by_fba, analyse_by_fva
 from mod_cobra.fbva.serialization.fbva_sbml_manager import create_fva_model
 from mod_sbml.utils.path_manager import create_dirs
-from mod_sbml.serialization import get_sbml_r_formula, format_m_name
+from mod_sbml.serialization import get_sbml_r_formula
 from mod_sbml.sbml.ubiquitous_manager import get_ubiquitous_chebi_ids, \
     select_metabolite_ids_by_term_ids
 from mod_cobra.efm.serialization import coupled_reaction_group_serializer, community_serializer, efm_serializer
@@ -80,8 +80,8 @@ def _prepare_dir(super_dir, dir_name, log):
 
 
 def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2rev=None, threshold=ZERO_THRESHOLD,
-                  do_fva=True, do_fba=True, do_efm=True, max_efm_number=1000, cofactors=None, mask_shift=4,
-                  get_f_path=None, tree_efm_path=TREEEFM_PATH):
+                  do_fva=True, do_fba=True, do_efm=True, max_efm_number=1000, mask_shift=4,
+                  get_f_path=None, tree_efm_path=TREEEFM_PATH, model_name='', main_dir=None):
     # create directories to store results
     logging.info("Preparing directories...")
     create_dirs(res_dir, False)
@@ -168,8 +168,9 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
                                       threshold, max_efm_number)
 
         for serializer in (efm_serializer.serialize, coupled_reaction_group_serializer.serialize):
-            description += serializer(model=model, path=cur_dir, get_f_path=get_f_path, in_m_id=in_m_id,
-                                      out_m_id=out_m_id, out_r_id=out_r_id, S=S)
+            description += \
+                serializer(model=model, path=cur_dir, get_f_path=get_f_path, in_m_id=in_m_id, out_m_id=out_m_id,
+                           out_r_id=out_r_id, S=S, model_name=model_name, main_dir=main_dir)
         logging.info('Serialized EFMA')
 
         if S.gr_id2r_id2c:
@@ -184,29 +185,6 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
                 if r_id in r_id2mask:
                     r_id2mask[new_r_id] |= r_id2mask[r_id]
 
-        # r_id2tooltip = {r_id: get_sbml_r_formula(model, model.getReaction(r_id), show_metabolite_ids=False)
-        #                 for r_id in S_merged.r_id2i.iterkeys()}
-        # description += describe('S.html', S=S_merged.N, r_id2i=S_merged.r_id2i, m_id2i=S_merged.m_id2i,
-        #                         r_id2tooltip=r_id2tooltip,
-        #                         m_id2tooltip={m_id: format_m_name(model.getSpecies(m_id), model, show_id=False)
-        #                                       for m_id in S_merged.m_id2i.iterkeys()})
-        efm_id2tr = {}
-
-        def to_tr(efm_id, header_class='header', main_classes={'submain', 'main'}, main_class='main'):
-            if efm_id in efm_id2tr:
-                return
-            if efm_id in S.gr_id2efm_ids:
-                for sub_efm_id in S.gr_id2efm_ids[efm_id]:
-                    to_tr(sub_efm_id, header_class='sub%s' % header_class,
-                          main_classes=main_classes - {main_class}, main_class='sub%s' % main_class)
-            efm_id2tr[efm_id] = describe('foldable_rows.html', S=S, efm_id=efm_id, header_class=header_class,
-                                         main_classes=main_classes, efm_id2tr=efm_id2tr)
-
-        for efm_id in S.efm_ids:
-            to_tr(efm_id)
-
-        description += describe('V.html', S=S, efm_id2tr=efm_id2tr)
-
     if not opt_val and not S.efm_id2i:
         description += describe('nothing_found.html')
 
@@ -218,7 +196,8 @@ def mean(values):
 
 
 def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_efm=True, max_efm_number=1000):
-    create_dirs(res_dir, True)
+    vis_dir = os.path.join(res_dir, 'visualization')
+    create_dirs(vis_dir, True)
     get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir)) if f else None
 
     mask_shift = 4
@@ -235,7 +214,8 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         S, r_id2w, sub_sbml, r_ids, description, mask_shift, cur_id2mask, cur_layer2mask, main_layer = \
             analyse_model(sbml=model_id, out_r_id=out_r_id, out_rev=out_rev, in_r_id2rev=in_r_id2rev, in_m_id=in_m_id,
                           out_m_id=out_m_id, res_dir=os.path.join(res_dir, name), do_fva=do_fva, do_fba=do_fba,
-                          do_efm=do_efm, mask_shift=mask_shift, get_f_path=get_f_path, max_efm_number=max_efm_number)
+                          do_efm=do_efm, mask_shift=mask_shift, get_f_path=get_f_path, max_efm_number=max_efm_number,
+                          model_name=name, main_dir=vis_dir)
 
         tab2html['Analysis of %s' % name] = description, None
         layer2mask.update({'%s: %s' % (name, layer): mask for (layer, mask) in cur_layer2mask.iteritems()})
@@ -300,7 +280,6 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         info = ''
         S = model_id2S[model_id].get_main_S()
         title = 'Model analysis'
-
 
     # Communities
     comm_dir = _prepare_dir(res_dir, 'communities', "Analysing communities...")
