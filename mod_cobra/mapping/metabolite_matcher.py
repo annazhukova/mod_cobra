@@ -1,10 +1,11 @@
 from collections import defaultdict
+from itertools import chain
 
 import libsbml
 
 from mod_sbml.serialization.csv_manager import metabolites2df, reactions2df, compartments2df
 from mod_sbml.sbml.compartment.compartment_positioner import get_go_term, GO_CYTOSOL, GO_CYTOPLASM
-from mod_sbml.annotation.chebi.chebi_annotator import get_species_to_chebi
+from mod_sbml.annotation.chebi.chebi_annotator import get_species_to_chebi, EQUIVALENT_RELATIONSHIPS
 from mod_sbml.onto import parse_simple
 from mod_sbml.annotation.chebi.chebi_serializer import get_chebi
 from mod_sbml.annotation.gene_ontology.go_serializer import get_go
@@ -21,20 +22,27 @@ def map_comps(model_id2dfs):
             key = key.strip().lower() if key else ''
             if key:
                 key2comp[key][model_id].add(c_id)
+    # if there are models with GO_CYTOPLASM and models with GO_CYTOSOL but none with both,
+    # merge GO_CYTOSOL and GO_CYTOPLASM
     if GO_CYTOPLASM in key2comp and GO_CYTOSOL in key2comp \
-            and not set(it[0] for it in key2comp[GO_CYTOSOL]) & set(it[0] for it in key2comp[GO_CYTOPLASM]):
+            and not set(key2comp[GO_CYTOSOL].iterkeys()) & set(key2comp[GO_CYTOPLASM].iterkeys()):
         key2comp[GO_CYTOPLASM].update(key2comp[GO_CYTOSOL])
         del key2comp[GO_CYTOSOL]
     return [comps for comps in key2comp.itervalues() if len(comps) > 1]
 
 
-def map_metabolites(model_id2dfs):
+def map_metabolites(model_id2dfs, chebi):
     key2ms = defaultdict(lambda: defaultdict(set))
     for model_id, [df, _, _] in model_id2dfs.iteritems():
         for index, row in df.iterrows():
             m_id, name, formula, kegg = row['Id'], row['Name'], row['Formula'], row['KEGG']
-            chebi = row["ChEBI"] if 'ChEBI' in row else None
-            key = chebi if chebi else (kegg if kegg else (formula if formula else name))
+            chebi_id = row["ChEBI"] if 'ChEBI' in row else None
+            if chebi_id:
+                chebi_id = \
+                    min(chain([chebi_id],
+                              (it.get_id() for it in chebi.get_equivalents(term=chebi.get_term(chebi_id),
+                                                                           relationships=EQUIVALENT_RELATIONSHIPS))))
+            key = chebi_id if chebi_id else (kegg if kegg else (formula if formula else name))
             key = key.strip().lower() if key else None
             if key:
                 key2ms[key][model_id].add(m_id)
@@ -54,8 +62,11 @@ def get_model_data(model_id2sbml, chebi=None, go=None):
     model_id2dfs = {}
 
     for model_id, sbml in model_id2sbml.iteritems():
-        doc = libsbml.SBMLReader().readSBML(sbml)
-        model = doc.getModel()
+        if isinstance(sbml, libsbml.Model):
+            model = sbml
+        else:
+            doc = libsbml.SBMLReader().readSBML(sbml)
+            model = doc.getModel()
         m_id2chebi_id = get_species_to_chebi(model, chebi)
         model_id2dfs[model_id] = \
             [metabolites2df(model, m_id2chebi_id), reactions2df(model),
@@ -64,9 +75,11 @@ def get_model_data(model_id2sbml, chebi=None, go=None):
     return model_id2dfs
 
 
-def map_metabolites_compartments(model_id2dfs):
+def map_metabolites_compartments(model_id2dfs, chebi=None):
+    if not chebi:
+        chebi = parse_simple(get_chebi())
 
-    model_id2m_ids_groups = map_metabolites(model_id2dfs)
+    model_id2m_ids_groups = map_metabolites(model_id2dfs, chebi)
     model_id2c_ids_groups = map_comps(model_id2dfs)
 
     model_id2c_id2i = defaultdict(dict)
@@ -90,4 +103,4 @@ def map_metabolites_compartments(model_id2dfs):
                     model_id2m_ids[model_id].add(m_id)
             if model_id2m_ids:
                 model_id2m_ids_same_comp_groups.append(model_id2m_ids)
-    return model_id2c_ids_groups, model_id2m_ids_same_comp_groups, model_id2c_id2i
+    return model_id2c_ids_groups, [it for it in model_id2m_ids_same_comp_groups if len(it) > 1], model_id2c_id2i

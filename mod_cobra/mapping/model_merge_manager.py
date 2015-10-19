@@ -54,4 +54,4 @@ def join(model_id2m_ids_groups, model_id2S):
 
 
 def merge(S, ignored_ids=None):
-    return S.remove_reaction_duplicates(ignored_ids)
+    S.remove_reaction_duplicates(ignored_ids)

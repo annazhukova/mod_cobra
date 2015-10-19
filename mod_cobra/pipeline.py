@@ -88,13 +88,13 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
     if not get_f_path:
         get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
 
-    # if in_r_id2rev:
-    #     logging.info("Constraining input reactions...")
-    #     doc = libsbml.SBMLReader().readSBML(sbml)
-    #     model = doc.getModel()
-    #     constraint_exchange_reactions(model, allowed_exchange_r_id2rev=in_r_id2rev, cofactors=cofactors)
-    #     sbml = os.path.join(res_dir, '%s_constrained.xml' % os.path.splitext(os.path.basename(sbml))[0])
-    #     libsbml.SBMLWriter().writeSBMLToFile(doc, sbml)
+    if in_r_id2rev:
+        logging.info("Constraining input reactions...")
+        doc = libsbml.SBMLReader().readSBML(sbml)
+        model = doc.getModel()
+        constraint_exchange_reactions(model, allowed_exchange_r_id2rev=in_r_id2rev)
+        sbml = os.path.join(res_dir, '%s.constrained.xml' % os.path.splitext(os.path.basename(sbml))[0])
+        libsbml.SBMLWriter().writeSBMLToFile(doc, sbml)
 
     # copy our model in the result directory
     if os.path.normpath(res_dir) != os.path.normpath(os.path.dirname(sbml)):
@@ -234,12 +234,12 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
         chebi = parse_simple(get_chebi())
         model_id2dfs = get_model_data(model_id2sbml, chebi=chebi)
 
-        model_id2c_id_groups, model_id2m_id_groups, model_id2c_id2i = map_metabolites_compartments(model_id2dfs)
+        model_id2c_id_groups, model_id2m_id_groups, model_id2c_id2i = map_metabolites_compartments(model_id2dfs, chebi=chebi)
         logging.info('Mapped metabolites and compartments.')
         ignore_m_ids = get_ignored_metabolites(model_id2dfs, chebi)
         S = join(model_id2m_id_groups, model_id2S)
         ignore_m_ids |= {S.m_id2gr_id[m_id] for m_id in ignore_m_ids if m_id in S.m_id2gr_id}
-        S = merge(S, ignore_m_ids)
+        merge(S, ignore_m_ids)
         model_id2r_id_groups = get_r_id_groups(S)
         logging.info('Mapped reactions.')
         comp_csv, m_csv, r_csv = serialize_common_elements_to_csv(model_id2dfs, model_id2c_id_groups,

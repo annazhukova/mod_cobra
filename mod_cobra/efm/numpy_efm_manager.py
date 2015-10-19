@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import chain
 import numpy as np
 from scipy.sparse import csr_matrix
 from mod_cobra.efm import coefficient_to_binary
@@ -169,8 +170,9 @@ def get_unique_id(efm_id2i, prefix, i):
 def get_boundary_metabolites(N, v):
     ms = np.dot(N, v)
     replace_zeros(ms)
-    divider = 1.0 * min((abs(it) for it in ms if it))
-    ms /= divider
+    divider = 1.0 * min(chain([0], (abs(it) for it in ms if it)))
+    if divider:
+        ms /= divider
     return np.array([round_value(it) for it in ms])
 
 
