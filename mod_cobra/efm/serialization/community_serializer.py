@@ -4,18 +4,18 @@ import os
 from mod_cobra.html import describe
 from mod_cobra.efm.serialization import THICK_DELIMITER, r_id2c_to_string, THIN_DELIMITER, \
     write_detailed_r_id2c
+from mod_sbml.serialization import format_m_name
 
 __author__ = 'anna'
 
 
-def serialize_communities(S, id2cluster, id2intersection, id2imp_rns, path):
+def serialize_communities(model, S, id2cluster, id2intersection, id2imp_rns, id2bounds, path):
     comm_txt = os.path.join(path, 'Pathway_communities.txt')
     with open(comm_txt, 'w+') as f:
         f.write('Analysed %d pathways. ' % len(S.efm_id2i))
         all_fm_intersection = S.get_efm_intersection()
 
-        get_key = lambda r_id: (1 if r_id in all_fm_intersection else 0, (None, 0),
-                                (1 if r_id in all_fm_intersection else 0, 1), r_id)
+        get_key = lambda r_id: (1 if r_id in all_fm_intersection else 0, (None, 0), (None, 0), r_id)
 
         if all_fm_intersection:
             f.write('All pathways contain following %d reactions:\n\t%s.\n\n'
@@ -30,18 +30,27 @@ def serialize_communities(S, id2cluster, id2intersection, id2imp_rns, path):
             intersection = id2intersection[clu_id]
             hidden_r_ids = set(intersection.iterkeys())
             imp_rns = id2imp_rns[clu_id]
+            rs, ps = id2bounds[clu_id]
             f.write('%s of %d following pathways:\n\n\t%s\n\n'
                     % (clu_id, len(cluster), ', '.join(sorted(cluster))))
             if intersection:
-                f.write('all of which contain following reactions:\n\n\t%s\n\n'
+                f.write('Reactions contained by all of these EFMs:\n\n\t%s\n\n'
                         % (r_id2c_to_string(intersection, binary=True, get_key=get_key)))
             if imp_rns and imp_rns != intersection:
                 if intersection:
-                    f.write('which form a reaction community, which also contains following reactions:\n\n\t %s\n\n'
+                    f.write('The largest reaction community contains also:\n\n\t %s\n\n'
                             % (r_id2c_to_string(imp_rns, binary=True, hidden_r_ids=hidden_r_ids)))
                 else:
-                    f.write('its largest reaction community contains following reactions:\n\n\t %s\n\n'
+                    f.write('The largest reaction community contains:\n\n\t %s\n\n'
                             % (r_id2c_to_string(imp_rns, binary=True, hidden_r_ids=hidden_r_ids)))
+            if rs:
+                f.write('Input metabolites [numbers of pathways where they are present] are:\n\n\t%s\n\n'
+                        % ', '.join(('%s [%d]' % (format_m_name(model.getSpecies(m_id), model, False, True), count)
+                                     for (m_id, count) in sorted(rs.iteritems(), key=lambda (_, c): -c))))
+            if ps:
+                f.write('Output metabolites [numbers of pathways where they are present] are:\n\n\t%s\n\n'
+                        % ', '.join(('%s [%d]' % (format_m_name(model.getSpecies(m_id), model, False, True), count)
+                                     for (m_id, count) in sorted(ps.iteritems(), key=lambda (_, c): -c))))
     return comm_txt
 
 
@@ -74,9 +83,9 @@ def serialize_community(cl_id, cluster, intersection, imp_r_id2c, model, path):
     return cluster_txt
 
 
-def serialize(model, S, id2cluster, id2intersection, id2imp_rns, path, get_f_path):
+def serialize(model, S, id2cluster, id2intersection, id2bounds, id2imp_rns, path, get_f_path):
     logging.info('Serializaing reaction communities...')
-    communities_txt = serialize_communities(S, id2cluster, id2intersection, id2imp_rns, path)
+    communities_txt = serialize_communities(model, S, id2cluster, id2intersection, id2imp_rns, id2bounds, path)
     limit, community_data = \
         serialize_n_longest_communities(len(id2cluster), id2cluster, id2intersection, id2imp_rns, model, path)
     fm_block = describe('fm_block.html', element_num=limit, characteristics='longest',

@@ -1,3 +1,4 @@
+from collections import Counter
 import numpy as np
 
 from mod_cobra.efm import coefficient_to_binary
@@ -39,6 +40,12 @@ class PathwaySet(object):
         return {r_id: self.V[self.r_id2i[r_id], self.efm_id2i[efm_id]] for r_id in r_ids
                 if self.V[self.r_id2i[r_id], self.efm_id2i[efm_id]]}
 
+    def get_efm_ids(self, r_id, reversed=False, efm_ids=None):
+        if not efm_ids:
+            efm_ids = self.efm_id2i.iterkeys()
+        check = lambda it: (it < 0) if reversed else (it > 0)
+        return {efm_id for efm_id in efm_ids if check(self.V[self.r_id2i[r_id], self.efm_id2i[efm_id]])}
+
     def get_control_efficiency(self, efm_id, r_id):
         v = self.V[:, self.efm_id2i[efm_id]]
         return get_control_efficiency(v, self.r_id2i[r_id])
@@ -57,10 +64,10 @@ class System(object):
         if not r_id2i:
             r_id2i = st_matrix.r_id2i if st_matrix else (pws.r_id2i if pws else {})
         self.st_matrix = st_matrix
-        if N is not None and m_id2i and r_id2i:
+        if N is not None and m_id2i is not None and r_id2i is not None:
             self.st_matrix = StoichiometricMatrix(N, m_id2i, r_id2i, boundary_m_ids)
         self.pws = pws
-        if V is not None and r_id2i:
+        if V is not None and r_id2i is not None:
             self.pws = PathwaySet(V, r_id2i, efm_id2i)
 
         self.r_ids = set(r_ids) if r_ids else set(self.r_id2i.iterkeys())
@@ -146,6 +153,14 @@ class System(object):
         r_id2st = {m_id: -b_ms[bm_id2i[m_id]] for m_id in bm_ids if b_ms[bm_id2i[m_id]] < 0}
         p_id2st = {m_id: b_ms[bm_id2i[m_id]] for m_id in bm_ids if b_ms[bm_id2i[m_id]] > 0}
         return r_id2st, p_id2st
+
+    def get_boundary_metabolite_distribution(self, fm_ids):
+        rs, ps = Counter(), Counter()
+        for fm_id in fm_ids:
+            r2st, p2st = self.get_boundary_inputs_outputs(fm_id)
+            rs.update({it: 1 for it in r2st.iterkeys()})
+            ps.update({it: 1 for it in p2st.iterkeys()})
+        return rs, ps
 
     def lump_coupled_reactions(self):
         coupled_r_id_groups = get_coupled_reactions(self.V, self.r_id2i)

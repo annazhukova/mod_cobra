@@ -11,14 +11,14 @@ from mod_sbml.sbml.sbml_manager import get_products, get_reactants
 __author__ = 'anna'
 
 
-def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=None, threshold=ZERO_THRESHOLD,
+def compute_efms(model, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=None, threshold=ZERO_THRESHOLD,
                  rewrite=True):
     """
     Computes elementary flux modes (EFMs) in a given SBML (see http://sbml.org) model,
     that contain a reaction of interest
     (using TreeEFM software [Pey et al. 2014, PMID: 25380956]).
 
-    :param sbml: string, path to the SBML file with the model.
+    :param model: libsbml.Model.
     :param directory: string, directory where to store the results, such as stoichiometric matrix, EFMs.
     :param tree_efm_path: string,path to the executable of TreeEFM software [Pey et al. 2014, PMID: 25380956].
     :param r_id: string, id of the reaction of interest.
@@ -33,8 +33,6 @@ def compute_efms(sbml, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=
     """
     if rewrite and not os.path.exists(tree_efm_path):
         raise ValueError("TreeEFM runner is not found at %s" % tree_efm_path)
-    doc = libsbml.SBMLReader().readSBML(sbml)
-    model = doc.getModel()
     # Compute stoichiometric matrix
     st_matrix_file = os.path.join(directory, "st_matrix.txt")
     s_id2i, r_id2i, rev_r_id2i = stoichiometric_matrix(model, st_matrix_file)

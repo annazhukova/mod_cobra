@@ -1,4 +1,5 @@
 import logging
+from mod_cobra.fbva import MAXIMIZE
 
 from mod_cobra.fbva.serialization import format_r_id, format_r_name
 
@@ -10,7 +11,7 @@ from mod_cobra import round_value
 __author__ = 'anna'
 
 
-def analyse_by_fba(cobra_model, bm_r_id, objective_sense='maximize', threshold=0):
+def analyse_by_fba(cobra_model, bm_r_id, objective_sense=MAXIMIZE, threshold=0):
     cobra_bm_r_id = format_r_id(bm_r_id)
     opt_value = optimise_biomass(cobra_model, cobra_bm_r_id, objective_sense, level=logging.DEBUG)
     if opt_value:
@@ -21,7 +22,7 @@ def analyse_by_fba(cobra_model, bm_r_id, objective_sense='maximize', threshold=0
     return {}, None
 
 
-def analyse_by_fva(cobra_model, bm_r_id, objective_sense='maximize', threshold=0):
+def analyse_by_fva(cobra_model, bm_r_id, objective_sense=MAXIMIZE, threshold=0):
     cobra_bm_r_id = format_r_id(bm_r_id)
     opt_value = optimise_biomass(cobra_model, cobra_bm_r_id, objective_sense, level=logging.DEBUG)
     if opt_value:
@@ -31,7 +32,7 @@ def analyse_by_fva(cobra_model, bm_r_id, objective_sense='maximize', threshold=0
     return {}, None
 
 
-def optimise_biomass(model, bm_id, objective_sense='maximize', level=logging.INFO):
+def optimise_biomass(model, bm_id, objective_sense=MAXIMIZE, level=logging.INFO):
     reaction = model.reactions.get_by_id(bm_id)
     model.change_objective([reaction])
     try:

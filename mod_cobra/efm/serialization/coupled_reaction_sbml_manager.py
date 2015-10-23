@@ -1,6 +1,6 @@
 import libsbml
 
-from mod_sbml.sbml.sbml_manager import create_reaction, create_compartment
+from mod_sbml.sbml.sbml_manager import create_reaction
 from mod_sbml.sbml.submodel_manager import remove_unused_species
 
 __author__ = 'anna'

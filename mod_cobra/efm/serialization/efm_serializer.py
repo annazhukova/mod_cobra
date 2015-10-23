@@ -140,6 +140,6 @@ def serialize(model, path, get_f_path, **kwargs):
                         element_name='EFM',
                         fms=[(efm_id, efm_len, get_f_path(efm_txt)) for (efm_id, efm_len, efm_txt) in efm_data],
                         all=limit == efm_num)
-    pw_matrix_html = pathway_matrix_serializer.serialize(S, model, in_m_id, out_m_id, model_name, main_dir)
+    # pw_matrix_html = pathway_matrix_serializer.serialize(S, model, in_m_id, out_m_id, model_name, main_dir)
     return describe('efms.html', efm_num=efm_num, fm_num=pw_num, description_filepath=get_f_path(pathways_txt),
-                    selected_efm_block=fm_block, pw_matrix_html=pw_matrix_html)
+                    selected_efm_block=fm_block, pw_matrix_html=None)

@@ -1,12 +1,12 @@
 import logging
 import re
+import sys
 
 import libsbml
-import sys
+
 from mod_sbml.annotation.chebi.chebi_serializer import get_chebi
 from examples.models import SR_MODEL, SR_MODEL_ANNOTATED, RECON_MODEL, SR_MODEL_SER
-
-from mapping.metabolite_matcher import get_model_data, map_metabolites_compartments
+from sbml.mapping.metabolite_matcher import get_model_data, map_metabolites_compartments
 from mod_sbml.sbml.compartment.compartment_manager import BOUNDARY_C_ID
 from mod_sbml.annotation.chebi.chebi_annotator import get_chebi_id
 from mod_sbml.annotation.kegg.kegg_annotator import get_kegg_m_id, get_kegg_r_id
