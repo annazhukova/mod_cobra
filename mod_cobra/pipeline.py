@@ -19,7 +19,7 @@ from mod_cobra.sbml.mapping.mapping_pipeline import combine_models
 from mod_cobra import ZERO_THRESHOLD
 from mod_cobra.fbva.serialization import format_r_id
 from mod_cobra.sbml import r_ids2sbml
-from mod_sbml.sbml.sbml_manager import get_products, get_reactants, get_r_comps
+from mod_sbml.sbml.sbml_manager import get_products, get_reactants, get_r_comps, get_model_name
 from sbml_vis.mimoza_pipeline import process_sbml
 from mod_cobra.fbva.fbva_analyser import analyse_by_fba, analyse_by_fva
 from mod_cobra.fbva.serialization.fbva_sbml_manager import create_fva_model
@@ -40,11 +40,13 @@ def _prepare_dir(super_dir, dir_name, log, rewrite=True):
 
 def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2rev=None, threshold=ZERO_THRESHOLD,
                   do_fva=True, do_fba=True, do_efm=True, max_efm_number=1000, mask_shift=4,
-                  get_f_path=None, tree_efm_path=TREEEFM_PATH, model_name='', main_dir=None, rewrite=True):
+                  get_f_path=None, tree_efm_path=TREEEFM_PATH, main_dir=None, rewrite=True):
+    model_name = get_model_name(sbml)
     logging.info('Analysing %s...' % model_name)
 
     # create directories to store results
     logging.info("Preparing directories...")
+    res_dir = os.path.join(res_dir, ''.join(ch for ch in model_name.replace(' ', '_') if ch.isalnum() or '_' == ch))
     create_dirs(res_dir, False)
     if not get_f_path:
         get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
@@ -115,7 +117,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
     if not opt_val and (not S or not S.efm_id2i):
         description += describe('nothing_found.html')
 
-    return S, sbml, vis_r_ids, description, mask_shift, r_id2mask, layer2mask, main_layer
+    return model_name, S, sbml, vis_r_ids, description, mask_shift, r_id2mask, layer2mask, main_layer
 
 
 def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_efm=True, max_efm_number=1000,
@@ -128,13 +130,13 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
     model_id2id2mask, model_id2vis_r_ids = {}, {}
     model_id2sbml, model_id2S = {}, {}
 
-    for model_id, (out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id, name) in sbml2parameters.iteritems():
-        model_id2S[name], model_id2sbml[name], model_id2vis_r_ids[name], description, mask_shift, \
+    for model_id, (out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id) in sbml2parameters.iteritems():
+        name, model_id2S[name], model_id2sbml[name], model_id2vis_r_ids[name], description, mask_shift, \
         model_id2id2mask[name], cur_layer2mask, main_layer = \
             analyse_model(sbml=model_id, out_r_id=out_r_id, out_rev=out_rev, in_r_id2rev=in_r_id2rev, in_m_id=in_m_id,
-                          out_m_id=out_m_id, res_dir=os.path.join(res_dir, name), do_fva=do_fva, do_fba=do_fba,
+                          out_m_id=out_m_id, res_dir=res_dir, do_fva=do_fva, do_fba=do_fba,
                           do_efm=do_efm, mask_shift=mask_shift, get_f_path=get_f_path, max_efm_number=max_efm_number,
-                          model_name=name, main_dir=vis_dir, rewrite=rewrite)
+                          main_dir=vis_dir, rewrite=rewrite)
 
         tab2html['Analysis of %s' % name] = description, None
         layer2mask.update({'%s: %s' % (name, layer): mask for (layer, mask) in cur_layer2mask.iteritems()})

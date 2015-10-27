@@ -3,13 +3,15 @@ import re
 import sys
 
 import libsbml
+from mod_sbml.annotation.kegg.pathway_manager import ORG_HUMAN
 
 from mod_sbml.annotation.chebi.chebi_serializer import get_chebi
-from examples.models import SR_MODEL, SR_MODEL_ANNOTATED, RECON_MODEL, SR_MODEL_SER
-from sbml.mapping.metabolite_matcher import get_model_data, map_metabolites_compartments
+from models import SR_MODEL, SR_MODEL_ANNOTATED, RECON_MODEL, SR_MODEL_SER
+from mod_cobra.sbml.mapping.metabolite_matcher import get_model_data, map_metabolites_compartments
 from mod_sbml.sbml.compartment.compartment_manager import BOUNDARY_C_ID
 from mod_sbml.annotation.chebi.chebi_annotator import get_chebi_id
-from mod_sbml.annotation.kegg.kegg_annotator import get_kegg_m_id, get_kegg_r_id
+from mod_sbml.annotation.kegg.kegg_annotator import get_kegg_m_id, get_kegg_r_id, get_kegg_r_id2r_ids, \
+    annotate_with_pathways
 from mod_sbml.sbml.reaction_boundary_manager import get_bounds, set_bounds
 from mod_sbml.sbml.sbml_manager import create_reaction, create_species, get_reactants, get_products, get_r_comps, generate_unique_id
 from mod_sbml.annotation.rdf_annotation_helper import add_annotation
@@ -22,6 +24,7 @@ def main():
     convert_annotations(SR_MODEL, SR_MODEL_ANNOTATED)
     separate_boundary_species(SR_MODEL_ANNOTATED, SR_MODEL_ANNOTATED)
     create_serine_sythesis(SR_MODEL_ANNOTATED, RECON_MODEL, SR_MODEL_SER)
+    annotate_with_pw(SR_MODEL_SER, SR_MODEL_SER, threshold=0.5)
 
 
 def convert_annotations(in_sbml, out_sbml):
@@ -200,6 +203,15 @@ def make_reversible(r):
         l_b = -u_b if u_b else -1000
     set_bounds(r, l_b, u_b)
     r.setReversible(True)
+
+
+def annotate_with_pw(in_sbml, out_sbml, threshold=0.5):
+    doc = libsbml.SBMLReader().readSBML(in_sbml)
+    model = doc.getModel()
+    kegg_r_id2r_ids = get_kegg_r_id2r_ids(model)
+    kegg_rns = set(kegg_r_id2r_ids.iterkeys())
+    annotate_with_pathways(ORG_HUMAN, model, kegg_rns, lambda r_id: kegg_r_id2r_ids[r_id], threshold)
+    libsbml.SBMLWriter().writeSBMLToFile(doc, out_sbml)
 
 
 if "__main__" == __name__:
