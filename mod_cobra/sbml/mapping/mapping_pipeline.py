@@ -13,7 +13,7 @@ __author__ = 'anna'
 def combine_models(model_id2sbml, model_id2S, path):
     logging.info('Going to merge models...')
     chebi = parse_simple(get_chebi())
-    model_id2dfs = get_model_data(model_id2sbml, chebi=chebi)
+    model_id2dfs = get_model_data(model_id2sbml)
     model_id2c_id_groups, model_id2m_id_groups, model_id2c_id2i = \
         map_metabolites_compartments(model_id2dfs, chebi=chebi)
     logging.info('Mapped metabolites and compartments.')

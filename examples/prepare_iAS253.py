@@ -3,15 +3,17 @@ import re
 import sys
 
 import libsbml
-from mod_sbml.annotation.kegg.pathway_manager import ORG_HUMAN
 
+from mod_sbml.annotation.annotator import annotate
+from mod_sbml.annotation.gene_ontology.go_serializer import get_go
+from mod_sbml.annotation.gene_ontology.go_annotator import annotate_compartments
+from mod_sbml.annotation.kegg.pathway_manager import ORG_HUMAN
 from mod_sbml.annotation.chebi.chebi_serializer import get_chebi
 from models import SR_MODEL, SR_MODEL_ANNOTATED, RECON_MODEL, SR_MODEL_SER
 from mod_cobra.sbml.mapping.metabolite_matcher import get_model_data, map_metabolites_compartments
 from mod_sbml.sbml.compartment.compartment_manager import BOUNDARY_C_ID
-from mod_sbml.annotation.chebi.chebi_annotator import get_chebi_id
-from mod_sbml.annotation.kegg.kegg_annotator import get_kegg_m_id, get_kegg_r_id, get_kegg_r_id2r_ids, \
-    annotate_with_pathways
+from mod_sbml.annotation.chebi.chebi_annotator import get_chebi_id, annotate_metabolites, CHEBI_PREFIX
+from mod_sbml.annotation.kegg.kegg_annotator import get_kegg_m_id, get_kegg_r_id, KEGG_COMPOUND_PREFIX, KEGG_REACTION_PREFIX
 from mod_sbml.sbml.reaction_boundary_manager import get_bounds, set_bounds
 from mod_sbml.sbml.sbml_manager import create_reaction, create_species, get_reactants, get_products, get_r_comps, generate_unique_id
 from mod_sbml.annotation.rdf_annotation_helper import add_annotation
@@ -24,7 +26,10 @@ def main():
     convert_annotations(SR_MODEL, SR_MODEL_ANNOTATED)
     separate_boundary_species(SR_MODEL_ANNOTATED, SR_MODEL_ANNOTATED)
     create_serine_sythesis(SR_MODEL_ANNOTATED, RECON_MODEL, SR_MODEL_SER)
-    annotate_with_pw(SR_MODEL_SER, SR_MODEL_SER, threshold=0.5)
+    input_doc = libsbml.SBMLReader().readSBML(SR_MODEL_SER)
+    model = input_doc.getModel()
+    annotate(model, pw_threshold=0.5, org=ORG_HUMAN)
+    libsbml.SBMLWriter().writeSBMLToFile(input_doc, SR_MODEL_SER)
 
 
 def convert_annotations(in_sbml, out_sbml):
@@ -41,14 +46,14 @@ def convert_annotations(in_sbml, out_sbml):
         _id = species.getId()
         s_ids = re.findall(r'C\d{4,7}', _id)
         if s_ids:
-            add_annotation(species, libsbml.BQB_IS, "http://identifiers.org/kegg.compound/%s" % s_ids.pop())
+            add_annotation(species, libsbml.BQB_IS, s_ids.pop(), KEGG_COMPOUND_PREFIX)
         if species.getName().find(_id) != -1:
             species.setName(species.getName().replace(_id, "").strip())
     for reaction in model.getListOfReactions():
         _id = reaction.getId()
         r_ids = re.findall(r'R\d{4,10}', _id)
         if r_ids:
-            add_annotation(reaction, libsbml.BQB_IS, "http://identifiers.org/kegg.reaction/%s" % r_ids.pop())
+            add_annotation(reaction, libsbml.BQB_IS, r_ids.pop(), KEGG_REACTION_PREFIX)
         if reaction.getName().find(_id) != -1:
             reaction.setName(reaction.getName().replace(_id, "").strip())
     libsbml.SBMLWriter().writeSBMLToFile(input_doc, out_sbml)
@@ -114,8 +119,13 @@ def create_serine_sythesis(sr_in_sbml, recon_sbml, sr_out_sbml):
 
     # create NH3 output: NH3_cyto -> NH3_b
     nh3_cyto = sr_model.getSpecies('C00014Cyto')
-    nh3_b = create_species(sr_model, compartment_id=BOUNDARY_C_ID, name=nh3_cyto.getName(), bound=True, id_='C00014_b',
-                           chebi_id=get_chebi_id(nh3_cyto), kegg_id=get_kegg_m_id(nh3_cyto))
+    chebi_id = get_chebi_id(nh3_cyto)
+    kegg_id = get_kegg_m_id(nh3_cyto)
+    nh3_b = create_species(sr_model, compartment_id=BOUNDARY_C_ID, name=nh3_cyto.getName(), bound=True, id_='C00014_b')
+    if kegg_id:
+        add_annotation(nh3_b, libsbml.BQB_IS, kegg_id.upper(), KEGG_COMPOUND_PREFIX)
+    if chebi_id:
+        add_annotation(nh3_b, libsbml.BQB_IS, chebi_id.upper(), CHEBI_PREFIX)
     r = create_reaction(sr_model, {nh3_b.getId(): 1}, {nh3_cyto.getId(): 1}, "NH3", True, "BoundaryNH3")
     set_bounds(r, -1000, 0)
 
@@ -146,8 +156,15 @@ def add_recon_reactions(sr_model, r_model, recon_r_ids_to_add, metabolite_id_map
     RECON2_ID = 'Recon2'
     SR_ID = 'SR'
     model_id2sbml = {SR_ID: sr_model, RECON2_ID: r_model}
+    go = parse_simple(get_go())
+    annotate_compartments(sr_model, go)
+    annotate_compartments(r_model, go)
+
     chebi = parse_simple(get_chebi())
-    model_id2dfs = get_model_data(model_id2sbml, chebi=chebi)
+    annotate_metabolites(sr_model, chebi)
+    annotate_metabolites(r_model, chebi)
+
+    model_id2dfs = get_model_data(model_id2sbml)
     model_id2c_ids_groups, model_id2m_ids_groups, model_id2c_id2i = \
         map_metabolites_compartments(model_id2dfs, chebi=chebi)
 
@@ -168,13 +185,17 @@ def add_recon_reactions(sr_model, r_model, recon_r_ids_to_add, metabolite_id_map
             df = model_id2dfs[RECON2_ID][0]
             row = df.loc[recon_m_id]
             kegg_id = row['KEGG']
-            chebi_id = row['ChEBI'] if 'ChEBI' in row else None
+            chebi_id = row['ChEBI']
             name = row['Name']
             c_id = c_id_recon2sr[row['Compartment']]
-            sr_m_id = create_species(chebi_id=chebi_id, kegg_id=kegg_id, name=name, compartment_id=c_id,
+            sr_m = create_species(name=name, compartment_id=c_id,
                                      model=sr_model, bound=recon_m_id2boundary_condition_to_add[recon_m_id],
-                                     id_=(recon_m_id if not kegg_id else kegg_id.upper()) + c_id).getId()
-            m_id_recon2sr[recon_m_id] = sr_m_id
+                                     id_=(recon_m_id if not kegg_id else kegg_id.upper()) + c_id)
+            if kegg_id:
+                add_annotation(sr_m, libsbml.BQB_IS, kegg_id.upper(), KEGG_COMPOUND_PREFIX)
+            if chebi_id:
+                add_annotation(sr_m, libsbml.BQB_IS, chebi_id.upper(), CHEBI_PREFIX)
+            m_id_recon2sr[recon_m_id] = sr_m.getId()
 
     for r_id in recon_r_ids_to_add:
         r = r_model.getReaction(r_id)
@@ -190,9 +211,11 @@ def add_recon_reactions(sr_model, r_model, recon_r_ids_to_add, metabolite_id_map
                                  % (r_model.getSpecies(r_m_id).getName(), r_m_id))
             p_id2st[m_id_recon2sr[r_m_id]] = st
         kegg_id = get_kegg_r_id(r)
-        create_reaction(sr_model, r_id2st, p_id2st, r.getName(), reversible=r.getReversible(),
-                        id_=r.getId() if not kegg_id else (kegg_id.upper() + "_".join(get_r_comps(r_id, r_model))),
-                        kegg_id=kegg_id)
+        new_r = create_reaction(sr_model, r_id2st, p_id2st, r.getName(), reversible=r.getReversible(),
+                                id_=r.getId() if not kegg_id
+                                else (kegg_id.upper() + "_".join(get_r_comps(r_id, r_model))))
+        if kegg_id:
+            add_annotation(new_r, libsbml.BQB_IS, kegg_id.upper(), KEGG_REACTION_PREFIX)
 
 
 def make_reversible(r):
@@ -203,15 +226,6 @@ def make_reversible(r):
         l_b = -u_b if u_b else -1000
     set_bounds(r, l_b, u_b)
     r.setReversible(True)
-
-
-def annotate_with_pw(in_sbml, out_sbml, threshold=0.5):
-    doc = libsbml.SBMLReader().readSBML(in_sbml)
-    model = doc.getModel()
-    kegg_r_id2r_ids = get_kegg_r_id2r_ids(model)
-    kegg_rns = set(kegg_r_id2r_ids.iterkeys())
-    annotate_with_pathways(ORG_HUMAN, model, kegg_rns, lambda r_id: kegg_r_id2r_ids[r_id], threshold)
-    libsbml.SBMLWriter().writeSBMLToFile(doc, out_sbml)
 
 
 if "__main__" == __name__:

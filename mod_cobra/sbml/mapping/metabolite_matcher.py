@@ -4,11 +4,10 @@ from itertools import chain
 import libsbml
 
 from mod_sbml.serialization.csv_manager import metabolites2df, reactions2df, compartments2df
-from mod_sbml.sbml.compartment.compartment_positioner import get_go_term, GO_CYTOSOL, GO_CYTOPLASM
-from mod_sbml.annotation.chebi.chebi_annotator import get_species_to_chebi, EQUIVALENT_RELATIONSHIPS
+from mod_sbml.sbml.compartment.compartment_positioner import GO_CYTOSOL, GO_CYTOPLASM
+from mod_sbml.annotation.chebi.chebi_annotator import EQUIVALENT_RELATIONSHIPS
 from mod_sbml.onto import parse_simple
 from mod_sbml.annotation.chebi.chebi_serializer import get_chebi
-from mod_sbml.annotation.gene_ontology.go_serializer import get_go
 
 __author__ = 'anna'
 
@@ -35,8 +34,7 @@ def map_metabolites(model_id2dfs, chebi):
     key2ms = defaultdict(lambda: defaultdict(set))
     for model_id, [df, _, _] in model_id2dfs.iteritems():
         for index, row in df.iterrows():
-            m_id, name, formula, kegg = row['Id'], row['Name'], row['Formula'], row['KEGG']
-            chebi_id = row["ChEBI"] if 'ChEBI' in row else None
+            m_id, name, formula, kegg, chebi_id = row['Id'], row['Name'], row['Formula'], row['KEGG'], row["ChEBI"]
             if chebi_id:
                 chebi_id = \
                     min(chain([chebi_id],
@@ -49,16 +47,7 @@ def map_metabolites(model_id2dfs, chebi):
     return [model_id2m_ids for model_id2m_ids in key2ms.itervalues() if len(model_id2m_ids) > 1]
 
 
-def get_model_data(model_id2sbml, chebi=None, go=None):
-    if not chebi:
-        chebi = parse_simple(get_chebi())
-    if not go:
-        go = parse_simple(get_go())
-
-    def get_t_id(comp):
-        term = get_go_term(comp, go)
-        return term.get_id() if term else None
-
+def get_model_data(model_id2sbml):
     model_id2dfs = {}
 
     for model_id, sbml in model_id2sbml.iteritems():
@@ -67,10 +56,7 @@ def get_model_data(model_id2sbml, chebi=None, go=None):
         else:
             doc = libsbml.SBMLReader().readSBML(sbml)
             model = doc.getModel()
-        m_id2chebi_id = get_species_to_chebi(model, chebi)
-        model_id2dfs[model_id] = \
-            [metabolites2df(model, m_id2chebi_id), reactions2df(model),
-             compartments2df(model, get_t_id)]
+        model_id2dfs[model_id] = [metabolites2df(model), reactions2df(model), compartments2df(model)]
 
     return model_id2dfs
 

@@ -1,9 +1,9 @@
 import sys
 
 import libsbml
-from mod_sbml.annotation.chebi.chebi_annotator import get_species_to_chebi
 from mod_sbml.annotation.chebi.chebi_serializer import get_chebi
 
+from mod_sbml.annotation.chebi.chebi_annotator import annotate_metabolites
 from examples.models import RECON_MODEL_BOUNDARY, RECON_MODEL
 from mod_sbml.sbml.compartment.compartment_manager import create_boundary_species_in_boundary_reactions
 from mod_sbml.onto import parse_simple
@@ -24,8 +24,9 @@ def add_boundary_metabolites(in_sbml, out_sbml):
     """
     input_doc = libsbml.SBMLReader().readSBML(in_sbml)
     model = input_doc.getModel()
-    m_id2chebi_id = get_species_to_chebi(model, parse_simple(get_chebi()))
-    create_boundary_species_in_boundary_reactions(model, m_id2chebi_id)
+    chebi = parse_simple(get_chebi())
+    annotate_metabolites(model, chebi)
+    create_boundary_species_in_boundary_reactions(model)
     libsbml.SBMLWriter().writeSBMLToFile(input_doc, out_sbml)
 
 
