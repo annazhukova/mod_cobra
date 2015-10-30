@@ -6,10 +6,7 @@ from mod_sbml.sbml.submodel_manager import remove_unused_species
 __author__ = 'anna'
 
 
-def create_folded_sbml(S, in_sbml, out_sbml):
-    doc = libsbml.SBMLReader().readSBML(in_sbml)
-    model = doc.getModel()
-
+def create_folded_model(S, model):
     r_id2new_r_id = {}
     initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
     r_ids_to_remove = [r.getId() for r in model.getListOfReactions() if r.getId() not in S.r_ids]
@@ -38,7 +35,4 @@ def create_folded_sbml(S, in_sbml, out_sbml):
             r.removeModifier(0)
 
     remove_unused_species(model)
-    model.setId('%s_folded' % model.getId())
-    model.setName('%s_folded' % model.getName())
-    libsbml.SBMLWriter().writeSBMLToFile(doc, out_sbml)
     return r_id2new_r_id

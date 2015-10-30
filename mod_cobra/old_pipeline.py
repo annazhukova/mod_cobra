@@ -9,10 +9,10 @@ import libsbml
 from sbml_vis.graph.color.color import get_n_colors
 from mod_cobra.fbva import MAXIMIZE, MINIMIZE
 from mod_cobra.fbva.serialization import fva_serializer, fba_serializer
-from mod_cobra.efm.community_detector import detect_pathway_communities, detect_reaction_community
+from mod_cobra.efm.community_detector import detect_communities_by_boundary_metabolites, detect_reaction_community
 from mod_cobra.efm.efm_pipeline import analyse_model_efm
 from mod_cobra.html import describe
-from mod_cobra.efm.serialization.coupled_reaction_sbml_manager import create_folded_sbml
+from mod_cobra.efm.serialization.coupled_reaction_sbml_manager import create_folded_model
 from mod_cobra.sbml.constraint_manager import constraint_exchange_reactions
 from mod_cobra.sbml.serialization import model_serializer, mapping_serializer
 from mod_cobra.sbml.mapping.mapping_pipeline import combine_models
@@ -52,7 +52,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
         get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
 
     if in_r_id2rev:
-        sbml = constraint_exchange_reactions(sbml, allowed_exchange_r_id2rev=in_r_id2rev, path=res_dir)
+        sbml = constraint_exchange_reactions(sbml, forsed_r_id2rev=in_r_id2rev)
 
     # copy our model in the result directory
     if os.path.normpath(res_dir) != os.path.normpath(os.path.dirname(sbml)):
@@ -106,7 +106,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
 
         if S.gr_id2r_id2c:
             clique_merged_sbml = os.path.join(cur_dir, 'Model_folded.xml')
-            r_id2new_r_id = create_folded_sbml(S, sbml, clique_merged_sbml)
+            r_id2new_r_id = create_folded_model(S, sbml, clique_merged_sbml)
             sbml = clique_merged_sbml
 
             vis_r_ids |= {cl_id for (r_id, cl_id) in r_id2new_r_id.iteritems() if r_id in vis_r_ids}
@@ -170,7 +170,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
 
     # Communities
     comm_dir = _prepare_dir(res_dir, 'communities', "Analysing communities...")
-    id2cluster = detect_pathway_communities(S)
+    id2cluster = detect_communities_by_boundary_metabolites(S)
     id2intersection = {cl_id: S.get_efm_intersection(cluster) for (cl_id, cluster) in id2cluster.iteritems()}
     # id2imp_rns = {cl_id: {} for (cl_id, cluster) in id2cluster.iteritems()}
     id2bounds = {cl_id: S.get_boundary_metabolite_distribution(cluster) for (cl_id, cluster) in id2cluster.iteritems()}

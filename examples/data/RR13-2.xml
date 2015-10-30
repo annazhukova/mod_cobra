@@ -1,0 +1,565 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level2/version4" level="2" version="4">
+  <model id="RR13-2">
+    <listOfCompartments>
+      <compartment id="c"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="PEPm" compartment="c" boundaryCondition="false"/>
+      <species id="ASPm" compartment="c" boundaryCondition="false"/>
+      <species id="PEPc" compartment="c" boundaryCondition="false"/>
+      <species id="ACoAc" compartment="c" boundaryCondition="false"/>
+      <species id="PYRm" compartment="c" boundaryCondition="false"/>
+      <species id="MALm" compartment="c" boundaryCondition="false"/>
+      <species id="PYRc" compartment="c" boundaryCondition="false"/>
+      <species id="MALc" compartment="c" boundaryCondition="false"/>
+      <species id="s_3PG" compartment="c" boundaryCondition="false"/>
+      <species id="G3P" compartment="c" boundaryCondition="false"/>
+      <species id="GLNm" compartment="c" boundaryCondition="false"/>
+      <species id="OAAc" compartment="c" boundaryCondition="false"/>
+      <species id="GLUTm" compartment="c" boundaryCondition="false"/>
+      <species id="ACoAm" compartment="c" boundaryCondition="false"/>
+      <species id="GLUTc" compartment="c" boundaryCondition="false"/>
+      <species id="CITm" compartment="c" boundaryCondition="false"/>
+      <species id="R5P" compartment="c" boundaryCondition="false"/>
+      <species id="CITc" compartment="c" boundaryCondition="false"/>
+      <species id="G6P" compartment="c" boundaryCondition="false"/>
+      <species id="OAAm" compartment="c" boundaryCondition="false"/>
+      <species id="AKGm" compartment="c" boundaryCondition="false"/>
+      <species id="AKGc" compartment="c" boundaryCondition="false"/>
+      <species id="ASPc" compartment="c" boundaryCondition="false"/>
+      <species id="ASP" compartment="c" boundaryCondition="true"/>
+      <species id="ATPm" compartment="c" boundaryCondition="true"/>
+      <species id="ATPc" compartment="c" boundaryCondition="true"/>
+      <species id="GLUC" compartment="c" boundaryCondition="true"/>
+      <species id="GLUCc" compartment="c" boundaryCondition="false"/>
+      <species id="SER" compartment="c" boundaryCondition="true"/>
+      <species id="SERc" compartment="c" boundaryCondition="false"/>
+      <species id="NADm" compartment="c" boundaryCondition="true"/>
+      <species id="GLN" compartment="c" boundaryCondition="true"/>
+      <species id="GLNc" compartment="c" boundaryCondition="false"/>
+      <species id="NADHc" compartment="c" boundaryCondition="true"/>
+      <species id="Hm" compartment="c" boundaryCondition="true"/>
+      <species id="Hc" compartment="c" boundaryCondition="true"/>
+      <species id="NADHm" compartment="c" boundaryCondition="true"/>
+      <species id="NH3" compartment="c" boundaryCondition="true"/>
+      <species id="NADPHc" compartment="c" boundaryCondition="true"/>
+      <species id="NADc" compartment="c" boundaryCondition="true"/>
+      <species id="CO2" compartment="c" boundaryCondition="true"/>
+      <species id="Pim" compartment="c" boundaryCondition="true"/>
+      <species id="ADPm" compartment="c" boundaryCondition="true"/>
+      <species id="BASES" compartment="c" boundaryCondition="true"/>
+      <species id="ADPc" compartment="c" boundaryCondition="true"/>
+      <species id="Pic" compartment="c" boundaryCondition="true"/>
+      <species id="Palmitate" compartment="c" boundaryCondition="true"/>
+      <species id="NADPc" compartment="c" boundaryCondition="true"/>
+      <species id="CoAc" compartment="c" boundaryCondition="true"/>
+      <species id="LAC" compartment="c" boundaryCondition="true"/>
+      <species id="LACc" compartment="c" boundaryCondition="false"/>
+    </listOfSpecies>
+    <listOfReactions>
+      <reaction id="G1" reversible="false">
+        <listOfReactants>
+          <speciesReference species="GLUCc" stoichiometry="1"/>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="G6P" stoichiometry="1"/>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="G2" reversible="false">
+        <listOfReactants>
+          <speciesReference species="G6P" stoichiometry="1"/>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="G3P" stoichiometry="2"/>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="G3" reversible="true">
+        <listOfReactants>
+          <speciesReference species="G3P" stoichiometry="1"/>
+          <speciesReference species="NADc" stoichiometry="1"/>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+          <speciesReference species="Pic" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="s_3PG" stoichiometry="1"/>
+          <speciesReference species="NADHc" stoichiometry="1"/>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="GG3" reversible="false">
+        <listOfReactants>
+          <speciesReference species="G3P" stoichiometry="2"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="G6P" stoichiometry="1"/>
+          <speciesReference species="Pic" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="GG4" reversible="false">
+        <listOfReactants>
+          <speciesReference species="G6P" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="GLUCc" stoichiometry="1"/>
+          <speciesReference species="Pic" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="ENOMUT" reversible="true">
+        <listOfReactants>
+          <speciesReference species="PEPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="s_3PG" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PK" reversible="false">
+        <listOfReactants>
+          <speciesReference species="PEPc" stoichiometry="1"/>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="PYRc" stoichiometry="1"/>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="NN" reversible="true">
+        <listOfReactants>
+          <speciesReference species="NADHc" stoichiometry="1"/>
+          <speciesReference species="NADm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="NADHm" stoichiometry="1"/>
+          <speciesReference species="NADc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PYC" reversible="false">
+        <listOfReactants>
+          <speciesReference species="PYRm" stoichiometry="1"/>
+          <speciesReference species="CO2" stoichiometry="1"/>
+          <speciesReference species="ATPm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="OAAm" stoichiometry="1"/>
+          <speciesReference species="Pim" stoichiometry="1"/>
+          <speciesReference species="ADPm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PDH" reversible="false">
+        <listOfReactants>
+          <speciesReference species="PYRm" stoichiometry="1"/>
+          <speciesReference species="NADm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="ACoAm" stoichiometry="1"/>
+          <speciesReference species="NADHm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="K3" reversible="false">
+        <listOfReactants>
+          <speciesReference species="ACoAm" stoichiometry="1"/>
+          <speciesReference species="OAAm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="CITm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="K4" reversible="true">
+        <listOfReactants>
+          <speciesReference species="CITm" stoichiometry="1"/>
+          <speciesReference species="NADm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AKGm" stoichiometry="1"/>
+          <speciesReference species="NADHm" stoichiometry="1"/>
+          <speciesReference species="CO2" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="K567" reversible="false">
+        <listOfReactants>
+          <speciesReference species="AKGm" stoichiometry="1"/>
+          <speciesReference species="NADm" stoichiometry="1"/>
+          <speciesReference species="Pim" stoichiometry="1"/>
+          <speciesReference species="ADPm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="MALm" stoichiometry="1"/>
+          <speciesReference species="NADHm" stoichiometry="1"/>
+          <speciesReference species="CO2" stoichiometry="1"/>
+          <speciesReference species="ATPm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="MDH1" reversible="true">
+        <listOfReactants>
+          <speciesReference species="MALc" stoichiometry="1"/>
+          <speciesReference species="NADc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="OAAc" stoichiometry="1"/>
+          <speciesReference species="NADHc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="MDH2" reversible="true">
+        <listOfReactants>
+          <speciesReference species="MALm" stoichiometry="1"/>
+          <speciesReference species="NADm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="OAAm" stoichiometry="1"/>
+          <speciesReference species="NADHm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="ME1" reversible="true">
+        <listOfReactants>
+          <speciesReference species="MALc" stoichiometry="1"/>
+          <speciesReference species="NADPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="PYRc" stoichiometry="1"/>
+          <speciesReference species="NADPHc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="ME2" reversible="true">
+        <listOfReactants>
+          <speciesReference species="MALm" stoichiometry="1"/>
+          <speciesReference species="NADm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="PYRm" stoichiometry="1"/>
+          <speciesReference species="NADHm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PEPCK1" reversible="false">
+        <listOfReactants>
+          <speciesReference species="OAAc" stoichiometry="1"/>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="PEPc" stoichiometry="1"/>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+          <speciesReference species="Pic" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PEPCK2" reversible="false">
+        <listOfReactants>
+          <speciesReference species="OAAm" stoichiometry="1"/>
+          <speciesReference species="ATPm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="PEPm" stoichiometry="1"/>
+          <speciesReference species="ADPm" stoichiometry="1"/>
+          <speciesReference species="Pim" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="GOT1" reversible="true">
+        <listOfReactants>
+          <speciesReference species="GLUTc" stoichiometry="1"/>
+          <speciesReference species="OAAc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="ASPc" stoichiometry="1"/>
+          <speciesReference species="AKGc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="GOT2" reversible="true">
+        <listOfReactants>
+          <speciesReference species="GLUTm" stoichiometry="1"/>
+          <speciesReference species="OAAm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="ASPm" stoichiometry="1"/>
+          <speciesReference species="AKGm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="CL" reversible="false">
+        <listOfReactants>
+          <speciesReference species="CITc" stoichiometry="1"/>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+          <speciesReference species="CoAc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="ACoAc" stoichiometry="1"/>
+          <speciesReference species="OAAc" stoichiometry="1"/>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+          <speciesReference species="Pic" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="RC" reversible="false">
+        <listOfReactants>
+          <speciesReference species="NADHm" stoichiometry="1"/>
+          <speciesReference species="Hm" stoichiometry="10"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="NADm" stoichiometry="1"/>
+          <speciesReference species="Hc" stoichiometry="10"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="L" reversible="false">
+        <listOfReactants>
+          <speciesReference species="Hc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Hm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="AS" reversible="true">
+        <listOfReactants>
+          <speciesReference species="ADPm" stoichiometry="1"/>
+          <speciesReference species="Pim" stoichiometry="1"/>
+          <speciesReference species="Hc" stoichiometry="3"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="ATPm" stoichiometry="1"/>
+          <speciesReference species="Hm" stoichiometry="3"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="ANT" reversible="true">
+        <listOfReactants>
+          <speciesReference species="ATPm" stoichiometry="1"/>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+          <speciesReference species="ADPm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="ATPASE" reversible="false">
+        <listOfReactants>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+          <speciesReference species="Pic" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T1" reversible="true">
+        <listOfReactants>
+          <speciesReference species="CITm" stoichiometry="1"/>
+          <speciesReference species="MALc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="CITc" stoichiometry="1"/>
+          <speciesReference species="MALm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T2" reversible="true">
+        <listOfReactants>
+          <speciesReference species="AKGc" stoichiometry="1"/>
+          <speciesReference species="MALm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AKGm" stoichiometry="1"/>
+          <speciesReference species="MALc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T3" reversible="true">
+        <listOfReactants>
+          <speciesReference species="MALm" stoichiometry="1"/>
+          <speciesReference species="Pic" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="MALc" stoichiometry="1"/>
+          <speciesReference species="Pim" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T4" reversible="true">
+        <listOfReactants>
+          <speciesReference species="GLUTc" stoichiometry="1"/>
+          <speciesReference species="ASPm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="GLUTm" stoichiometry="1"/>
+          <speciesReference species="ASPc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T5" reversible="true">
+        <listOfReactants>
+          <speciesReference species="Pic" stoichiometry="1"/>
+          <speciesReference species="Hc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Pim" stoichiometry="1"/>
+          <speciesReference species="Hm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T6" reversible="false">
+        <listOfReactants>
+          <speciesReference species="PYRc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="PYRm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T7" reversible="true">
+        <listOfReactants>
+          <speciesReference species="PEPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="PEPm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T8" reversible="true">
+        <listOfReactants>
+          <speciesReference species="GLNc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="GLNm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="T9" reversible="true">
+        <listOfReactants>
+          <speciesReference species="GLUTc" stoichiometry="1"/>
+          <speciesReference species="Hc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="GLUTm" stoichiometry="1"/>
+          <speciesReference species="Hm" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="GS1" reversible="false">
+        <listOfReactants>
+          <speciesReference species="GLUTc" stoichiometry="1"/>
+          <speciesReference species="NH3" stoichiometry="1"/>
+          <speciesReference species="ATPc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="GLNc" stoichiometry="1"/>
+          <speciesReference species="ADPc" stoichiometry="1"/>
+          <speciesReference species="Pic" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="GLS1" reversible="false">
+        <listOfReactants>
+          <speciesReference species="GLNm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="GLUTm" stoichiometry="1"/>
+          <speciesReference species="NH3" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="AA2" reversible="false">
+        <listOfReactants>
+          <speciesReference species="s_3PG" stoichiometry="1"/>
+          <speciesReference species="GLUTc" stoichiometry="1"/>
+          <speciesReference species="NADc" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="SERc" stoichiometry="1"/>
+          <speciesReference species="AKGc" stoichiometry="1"/>
+          <speciesReference species="NADHc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="GLUD1" reversible="true">
+        <listOfReactants>
+          <speciesReference species="GLUTm" stoichiometry="1"/>
+          <speciesReference species="NADm" stoichiometry="1"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="AKGm" stoichiometry="1"/>
+          <speciesReference species="NADHm" stoichiometry="1"/>
+          <speciesReference species="NH3" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PP1" reversible="false">
+        <listOfReactants>
+          <speciesReference species="G6P" stoichiometry="1"/>
+          <speciesReference species="NADPc" stoichiometry="2"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="R5P" stoichiometry="1"/>
+          <speciesReference species="NADPHc" stoichiometry="2"/>
+          <speciesReference species="Hc" stoichiometry="2"/>
+          <speciesReference species="CO2" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PP2" reversible="true">
+        <listOfReactants>
+          <speciesReference species="R5P" stoichiometry="3"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="G6P" stoichiometry="2"/>
+          <speciesReference species="G3P" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PUR" reversible="false">
+        <listOfReactants>
+          <speciesReference species="R5P" stoichiometry="1"/>
+          <speciesReference species="GLNc" stoichiometry="2"/>
+          <speciesReference species="ATPc" stoichiometry="3"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="BASES" stoichiometry="1"/>
+          <speciesReference species="GLUTc" stoichiometry="2"/>
+          <speciesReference species="ADPc" stoichiometry="3"/>
+          <speciesReference species="Pic" stoichiometry="3"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="PL1" reversible="false">
+        <listOfReactants>
+          <speciesReference species="ACoAc" stoichiometry="8"/>
+          <speciesReference species="ATPc" stoichiometry="7"/>
+          <speciesReference species="NADPHc" stoichiometry="14"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="Palmitate" stoichiometry="1"/>
+          <speciesReference species="ADPc" stoichiometry="7"/>
+          <speciesReference species="Pic" stoichiometry="7"/>
+          <speciesReference species="NADPc" stoichiometry="14"/>
+          <speciesReference species="CoAc" stoichiometry="8"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="LDH" reversible="true">
+        <listOfReactants>
+          <speciesReference species="PYRc" stoichiometry="1"/>             
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="LACc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>  
+      <reaction id="ASPUP" reversible="false">
+        <listOfReactants>
+          <speciesReference species="ASP" stoichiometry="1"/>             
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="ASPc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction> 
+      <reaction id="GLUCUP" reversible="false">
+        <listOfReactants>
+          <speciesReference species="GLUC" stoichiometry="1"/>             
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="GLUCc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction> 
+      <reaction id="GLNCUP" reversible="false">
+        <listOfReactants>
+          <speciesReference species="GLN" stoichiometry="1"/>             
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="GLNc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction> 
+      <reaction id="LACIO" reversible="true">
+        <listOfReactants>
+          <speciesReference species="LAC" stoichiometry="1"/>             
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="LACc" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction> 
+      <reaction id="SEROUT" reversible="false">
+        <listOfReactants>
+          <speciesReference species="SERc" stoichiometry="1"/>             
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="SER" stoichiometry="1"/>
+        </listOfProducts>
+      </reaction>      
+    </listOfReactions>
+  </model>
+</sbml>

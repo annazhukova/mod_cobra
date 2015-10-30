@@ -31,6 +31,6 @@ setup(name='mod_cobra',
       ],
       download_url='https://github.com/annazhukova/mod_cobra',
       install_requires=['python-libsbml-experimental', 'numpy', 'cobra', 'mod_sbml', 'scipy', 'jinja2', 'igraph',
-                        'louvain', 'sbml_vis']
+                        'louvain', 'mimoza']
       )
 

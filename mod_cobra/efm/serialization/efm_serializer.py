@@ -9,33 +9,30 @@ from mod_cobra.efm.serialization import pathway_matrix_serializer
 __author__ = 'anna'
 
 
-def serialize_n_most_efficient_efms(model, path, S, out_m_id, in_m_id, out_r_id, n=3):
+def serialize_n_shortest_efms(model, path, S, n=3):
     initial_efm_ids = {efm_id for efm_id in S.efm_id2i.iterkeys() if efm_id not in S.gr_id2efm_ids}
     initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
     limit = min(n if n is not None and n >= 0 else len(S.efm_id2i), len(S.efm_id2i))
     efm_data = [(efm_id, S.get_len(efm_id, r_ids=initial_r_ids),
-                 serialize_efm(S, efm_id, in_m_id, out_m_id, out_r_id, model, path))
+                 serialize_efm(S, efm_id, model, path))
                 for efm_id in sorted(initial_efm_ids,
-                                     key=lambda efm_id:
-                                     (-S.pws.get_control_efficiency(efm_id, out_r_id), efm_id))[0: limit]]
+                                     key=lambda efm_id: (S.get_len(efm_id, r_ids=initial_r_ids), efm_id))[0: limit]]
     return limit, efm_data
 
 
-def serialize_efm(S, efm_id, in_m_id, out_m_id, out_r_id, model, path):
+def serialize_efm(S, efm_id, model, path):
     efm_txt = os.path.join(path, '%s.txt' % efm_id)
     initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
     r_id2c = S.pws.get_r_id2coeff(efm_id, r_ids=initial_r_ids)
     with open(efm_txt, 'w+') as f:
-        f.write('EFM %s of length %d, of yield %g, of efficiency %g\n\n'
-                % (efm_id, len(r_id2c), round_value(S.get_yield(efm_id, in_m_id, out_m_id)),
-                   round_value(S.pws.get_control_efficiency(efm_id, out_r_id))))
-        write_inputs_outputs(f, model, S.get_boundary_inputs_outputs(efm_id), in_m_id)
+        f.write('EFM %s of length %d\n\n' % (efm_id, len(r_id2c)))
+        write_inputs_outputs(f, model, S.get_boundary_inputs_outputs(efm_id))
         f.write(THIN_DELIMITER)
         write_detailed_r_id2c(model, r_id2c, f)
     return efm_txt
 
 
-def serialize_efms(model, path, S, out_m_id, in_m_id, out_r_id):
+def serialize_efms(model, path, S):
     initial_efm_ids = {efm_id for efm_id in S.efm_id2i.iterkeys() if efm_id not in S.gr_id2efm_ids}
     initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
     all_fm_intersection = S.get_efm_intersection(initial_efm_ids, r_ids=initial_r_ids)
@@ -57,7 +54,7 @@ def serialize_efms(model, path, S, out_m_id, in_m_id, out_r_id):
 
     pathways_txt = os.path.join(path, 'pathways.txt')
     with open(pathways_txt, 'w+') as f:
-        f.write('Found %d EFMs, grouped into %d pathways:\n\n' % (len(initial_efm_ids), len(S.efm_ids)))
+        f.write('Found %d EFMs, grouped into %d behaviours:\n\n' % (len(initial_efm_ids), len(S.efm_ids)))
         f.write(THICK_DELIMITER)
 
         if all_fm_intersection and len(all_fm_intersection):
@@ -67,21 +64,16 @@ def serialize_efms(model, path, S, out_m_id, in_m_id, out_r_id):
             f.write(THICK_DELIMITER)
 
         for fm_id in sorted(S.efm_ids):
-            write_pathway(model=model, pathway_id=fm_id, S=S,
-                          out_m_id=out_m_id, in_m_id=in_m_id, out_r_id=out_r_id, get_key=get_key, f=f)
+            write_pathway(model=model, pathway_id=fm_id, S=S, get_key=get_key, f=f)
             f.write(THICK_DELIMITER)
     return pathways_txt, (len(initial_efm_ids), len(S.efm_ids))
 
 
-def write_pathway(model, pathway_id, S, out_m_id, in_m_id, out_r_id, get_key, f):
-    write_inputs_outputs(f, model, S.get_boundary_inputs_outputs(pathway_id), in_m_id)
-    fm_yield = S.get_yield(pathway_id, in_m_id, out_m_id)
-    if fm_yield is not None:
-        f.write('Yield: %g;\n\n' % round_value(fm_yield))
+def write_pathway(model, pathway_id, S, get_key, f):
+    write_inputs_outputs(f, model, S.get_boundary_inputs_outputs(pathway_id))
 
     if pathway_id not in S.pathways:
-        write_folded_efm(f_efm_id=pathway_id, S=S, out_r_id=out_r_id, in_m_id=in_m_id, out_m_id=out_m_id,
-                         get_key=get_key, f=f)
+        write_folded_efm(f_efm_id=pathway_id, S=S, get_key=get_key, f=f)
         return
 
     f.write('%s of length %d:\n\n\t%s\n\n'
@@ -95,14 +87,12 @@ def write_pathway(model, pathway_id, S, out_m_id, in_m_id, out_r_id, get_key, f)
             f.write('\t\t%s' % THIN_DELIMITER)
         else:
             started = True
-        write_folded_efm(f_efm_id=f_efm_id, S=S, out_r_id=out_r_id, in_m_id=in_m_id,
-                         out_m_id=out_m_id, get_key=get_key, f=f, tab='\t\t')
+        write_folded_efm(f_efm_id=f_efm_id, S=S, get_key=get_key, f=f, tab='\t\t')
 
 
-def write_folded_efm(f_efm_id, S, out_r_id, in_m_id, out_m_id, get_key, f, tab=''):
+def write_folded_efm(f_efm_id, S, get_key, f, tab=''):
     if f_efm_id not in S.folded_efms:
-        write_efm(efm_id=f_efm_id, S=S, out_r_id=out_r_id, in_m_id=in_m_id, out_m_id=out_m_id, get_key=get_key, f=f,
-                  tab=tab)
+        write_efm(efm_id=f_efm_id, S=S, get_key=get_key, f=f, tab=tab)
         return
 
     f.write('%s%s of length %d:\n\n%s\t%s\n\n'
@@ -118,25 +108,21 @@ def write_folded_efm(f_efm_id, S, out_r_id, in_m_id, out_m_id, get_key, f, tab='
             f.write('%s\t\t%s' % (tab, TINY_DELIMITER))
         else:
             started = True
-        write_efm(efm_id=efm_id, S=S, out_r_id=out_r_id, in_m_id=in_m_id, out_m_id=out_m_id, get_key=get_key, f=f,
-                  tab='%s\t\t' % tab, no_first_tab=len(efm_ids) == 1)
+        write_efm(efm_id=efm_id, S=S, get_key=get_key, f=f, tab='%s\t\t' % tab, no_first_tab=len(efm_ids) == 1)
 
 
-def write_efm(efm_id, S, out_r_id, in_m_id, out_m_id, get_key, f, tab='', no_first_tab=False):
+def write_efm(efm_id, S, get_key, f, tab='', no_first_tab=False):
     initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
-    f.write('%s%s of length %d, of efficiency %g, of yield %g:\n\n%s\t%s\n\n'
+    f.write('%s%s of length %d:\n\n%s\t%s\n\n'
             % ('' if no_first_tab else tab, efm_id, S.get_len(efm_id, r_ids=initial_r_ids),
-               round_value(S.pws.get_control_efficiency(efm_id, out_r_id)),
-               round_value(S.get_yield(efm_id, in_m_id, out_m_id)), tab,
-               r_id2c_to_string(S.pws.get_r_id2coeff(efm_id, r_ids=initial_r_ids), get_key=get_key)))
+               tab, r_id2c_to_string(S.pws.get_r_id2coeff(efm_id, r_ids=initial_r_ids), get_key=get_key)))
 
 
 def serialize(model, path, get_f_path, **kwargs):
-    out_m_id, in_m_id, out_r_id, model_name, main_dir, S = kwargs['out_m_id'], kwargs['in_m_id'], kwargs['out_r_id'], \
-                                                           kwargs['model_name'], kwargs['main_dir'], kwargs['S']
-    pathways_txt, (efm_num, pw_num) = serialize_efms(model, path, S, out_m_id, in_m_id, out_r_id)
-    limit, efm_data = serialize_n_most_efficient_efms(model, path, S, out_m_id, in_m_id, out_r_id, n=3)
-    fm_block = describe('fm_block.html', element_num=limit, characteristics='most effective',
+    model_name, S = kwargs['model_name'], kwargs['S']
+    pathways_txt, (efm_num, pw_num) = serialize_efms(model, path, S)
+    limit, efm_data = serialize_n_shortest_efms(model, path, S, n=3)
+    fm_block = describe('fm_block.html', element_num=limit, characteristics='shortest',
                         element_name='EFM',
                         fms=[(efm_id, efm_len, get_f_path(efm_txt)) for (efm_id, efm_len, efm_txt) in efm_data],
                         all=limit == efm_num)

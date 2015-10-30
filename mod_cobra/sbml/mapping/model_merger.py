@@ -95,11 +95,14 @@ def simple_merge_models(S, model_id2c_id2group, model_id2dfs, out_sbml):
     for ((model_id, efm_id), i) in ((it, i) for (it, i) in S.efm_id2i.iteritems() if it not in S.gr_id2efm_ids.keys()):
         new_id = '%s_%s' % (model_id, efm_id)
         new_efm_id2i[new_id] = i
+        model_id2id2id[model_id][efm_id] = new_id
 
     for gr, efm_ids in S.gr_id2efm_ids.iteritems():
         model_id, efm_id = next(efm_ids)
         new_id = 'merged_%s_%s' % (model_id, efm_id)
         new_efm_id2i[new_id] = S.r_id2i[gr]
+        for model_id, efm_id in efm_ids:
+            model_id2id2id[model_id][efm_id] = new_id
 
     libsbml.writeSBMLToFile(doc, out_sbml)
 

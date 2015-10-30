@@ -1,12 +1,67 @@
+from collections import defaultdict
 import logging
 
 from igraph import Graph
 from louvain import find_partition
+from tarjan import tarjan_iter
+from mod_cobra.sbml.mapping.metabolite_classifier import classify_m_ids
 
 __author__ = 'anna'
 
 
-def detect_fm_communities(S, r_id2w):
+def detect_communities_by_inputs_of_type(S, superclas, m_id2ch_id, chebi, threshold=75):
+    if len(S.efm_id2i) == 1:
+        return {'pc_0': [next(S.efm_id2i.iterkeys())]}
+
+    fm_ids = list(S.efm_id2i.iterkeys())
+
+    g = Graph(directed=False)
+    g.add_vertices(len(fm_ids))
+
+    def get_key(fm_id):
+        r2st, _ = S.get_boundary_inputs_outputs(fm_id)
+        class2m_ids = classify_m_ids(r2st.keys(), m_id2ch_id, chebi=chebi)
+        return set(class2m_ids[superclas]) if superclas in class2m_ids else set()
+
+    fm_id2boundary_ms = {fm_id: get_key(fm_id) for fm_id in fm_ids}
+    edges = []
+    weights = []
+    i = 1
+    for fm_id_1 in fm_ids:
+        rs1 = fm_id2boundary_ms[fm_id_1]
+        len1 = len(rs1)
+        for fm_id_2 in fm_ids[i:]:
+            rs2 = fm_id2boundary_ms[fm_id_2]
+            len2 = len(rs2)
+            common_len = len(rs1 & rs2)
+            local_total = max(len1, len2)
+            if not local_total or 100 * common_len / local_total > threshold:
+                edges.append((S.efm_id2i[fm_id_1], S.efm_id2i[fm_id_2]))
+                weights.append((100 - 100 * common_len / local_total) if local_total else 100)
+        i += 1
+
+    if not edges:
+        return {}
+
+    g.add_edges(edges)
+    g.es['weight'] = weights
+
+    logging.info("Looking for a partition...")
+    partition = find_partition(graph=g, method='Modularity', weight='weight')
+    logging.info("Found a partition...")
+    i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.iteritems()}
+    return dict(zip(('pc_%d' % it for it in xrange(0, len(partition))),
+                    ([i2efm_id[i] for i in cluster] for cluster in partition if len(cluster) > 1)))
+
+    # clustering = defaultdict(list)
+    # for efm_id in fm_ids:
+    #     clustering[get_key(efm_id)].append(efm_id)
+    #
+    # return dict(zip(('pc_%d' % it for it in xrange(0, len(clustering))),
+    #                 (cluster for cluster in clustering if len(cluster) > 1)))
+
+
+def detect_communities_by_reactions(S, r_id2w):
     if len(S.efm_id2i) == 1:
         return {'pc_0': [next(S.efm_id2i.iterkeys())]}
 
@@ -38,38 +93,37 @@ def detect_fm_communities(S, r_id2w):
                     ([i2efm_id[i] for i in cluster] for cluster in partition)))
 
 
-def detect_pathway_communities(S):
+def detect_communities_by_boundary_metabolites(S, cofactors=None, threshold=50):
     if len(S.efm_id2i) == 1:
         return {'pc_0': [next(S.efm_id2i.iterkeys())]}
+    if not cofactors:
+        cofactors = set()
 
     g = Graph(directed=False)
     g.add_vertices(len(S.efm_id2i))
 
     fm_ids = list(S.efm_id2i.iterkeys())
-    fm_id_pair2count = {}
 
     def get_key(fm_id):
         r2st, p2st = S.get_boundary_inputs_outputs(fm_id)
-        return set(r2st.iterkeys()), set(p2st.iterkeys())
+        return set(r2st.iterkeys()) - cofactors, set(p2st.iterkeys()) - cofactors
 
-    fm_id2boundary_ms = {fm_id: get_key(fm_id) for fm_id in S.efm_id2i.iterkeys()}
+    fm_id2boundary_ms = {fm_id: get_key(fm_id) for fm_id in fm_ids}
+    edges = []
+    weights = []
     i = 1
     for fm_id_1 in fm_ids:
         rs_1, ps_1 = fm_id2boundary_ms[fm_id_1]
+        len_1 = len(rs_1) + len(ps_1)
         for fm_id_2 in fm_ids[i:]:
             rs_2, ps_2 = fm_id2boundary_ms[fm_id_2]
-            fm_id_pair2count[(fm_id_1, fm_id_2)] = len(rs_1 & rs_2) + len(ps_1 & ps_2)
+            len_2 = len(rs_2) + len(ps_2)
+            common_len = len(rs_1 & rs_2) + len(ps_1 & ps_2)
+            local_total = max(len_1, len_2)
+            if not local_total or 100 * common_len / local_total > threshold:
+                edges.append((S.efm_id2i[fm_id_1], S.efm_id2i[fm_id_2]))
+                weights.append((100 - 100 * common_len / local_total) if local_total else 100)
         i += 1
-
-    avg_intersection = sum(fm_id_pair2count.itervalues()) / len(fm_id_pair2count)
-
-    logging.info("Building the FM graph, using %d as a threshold." % avg_intersection)
-    edges = []
-    weights = []
-    for (fm_id_1, fm_id_2), w in fm_id_pair2count.iteritems():
-        if w > avg_intersection:
-            edges.append((S.efm_id2i[fm_id_1], S.efm_id2i[fm_id_2]))
-            weights.append(w - avg_intersection)
 
     if not edges:
         return {}
@@ -83,6 +137,53 @@ def detect_pathway_communities(S):
     i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.iteritems()}
     return dict(zip(('pc_%d' % it for it in xrange(0, len(partition))),
                     ([i2efm_id[i] for i in cluster] for cluster in partition if len(cluster) > 1)))
+
+
+def detect_communities_by_subsystems(efm_ids, id2pws, threshold=50):
+    # g = Graph(directed=False)
+    # g.add_vertices(len(efm_ids))
+
+    efm_ids = sorted(efm_ids)
+
+    # i2efm_id = dict(enumerate(efm_ids))
+    # efm_id2i = {efm_id: i for (i, efm_id) in i2efm_id.iteritems()}
+
+    # edges = []
+    # weights = []
+    i = 1
+    graph = defaultdict(list)
+    for efm_id_1 in efm_ids:
+        pws1 = id2pws[efm_id_1]
+        if not pws1:
+            continue
+        # len_1 = len(pws1)
+        for efm_id_2 in efm_ids[i:]:
+            pws2 = id2pws[efm_id_2]
+            # len_2 = len(pws2)
+            # common_len = len(pws1 & pws2)
+            # local_total = max(len_1, len_2)
+            # if 100 * common_len / local_total > threshold:
+            #     edges.append((efm_id2i[efm_id_1], efm_id2i[efm_id_2]))
+            #     weights.append(100 - 100 * common_len / local_total)
+            if len(pws1 & pws2):
+                graph[efm_id_1].append(efm_id_2)
+                graph[efm_id_2].append(efm_id_1)
+                # edges.append((efm_id2i[efm_id_1], efm_id2i[efm_id_2]))
+                # edges.append((efm_id2i[efm_id_2], efm_id2i[efm_id_1]))
+                # weights.append(common_len)
+        i += 1
+
+    # if not edges:
+    #     return {}
+    #
+    # g.add_edges(edges)
+    # # g.es['weight'] = weights
+
+    logging.info("Looking for a partition...")
+    # partition = find_partition(graph=g, method='Modularity')
+    partition = [cluster for cluster in tarjan_iter(graph) if len(cluster) > 1]
+    logging.info("Found a partition...")
+    return dict(zip(('sub_pc_%d' % it for it in xrange(0, len(partition))), partition))
 
 
 def detect_reaction_community(S, efm_ids, selected_fm):

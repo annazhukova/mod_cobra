@@ -11,7 +11,7 @@ from mod_sbml.sbml.sbml_manager import get_products, get_reactants
 __author__ = 'anna'
 
 
-def compute_efms(model, directory, em_number, r_id, rev, tree_efm_path, r_id2rev=None, threshold=ZERO_THRESHOLD,
+def compute_efms(model, directory, em_number, tree_efm_path, r_id2rev=None, threshold=ZERO_THRESHOLD,
                  rewrite=True):
     """
     Computes elementary flux modes (EFMs) in a given SBML (see http://sbml.org) model,
@@ -21,8 +21,6 @@ def compute_efms(model, directory, em_number, r_id, rev, tree_efm_path, r_id2rev
     :param model: libsbml.Model.
     :param directory: string, directory where to store the results, such as stoichiometric matrix, EFMs.
     :param tree_efm_path: string,path to the executable of TreeEFM software [Pey et al. 2014, PMID: 25380956].
-    :param r_id: string, id of the reaction of interest.
-    :param rev: boolean, if the reaction of interest should be considered in the opposite direction.
     :param em_number: int, number of EFMs to compute with TreeEFM software [Pey et al. 2014, PMID: 25380956].
     :param r_id2rev: dictionary {r_id: reversed}, if specified,
     only EFMs that contain all of the reaction ids in specified directions (or any direction if reversed is None)
@@ -38,6 +36,9 @@ def compute_efms(model, directory, em_number, r_id, rev, tree_efm_path, r_id2rev
     s_id2i, r_id2i, rev_r_id2i = stoichiometric_matrix(model, st_matrix_file)
     logging.info("stoichiometric matrix saved to %s" % st_matrix_file)
     # Figure out in which reaction we are interested in
+    if not r_id2rev:
+        raise ValueError('At least one reaction of interest should be specified')
+    r_id, rev = next(r_id2rev.iteritems())
     if (rev and r_id not in rev_r_id2i) or (not rev and r_id not in r_id2i):
         raise ValueError("R%seaction with id %s is not found in the model" % ('eversed r' if rev else '', r_id))
     i = rev_r_id2i[r_id] if rev else r_id2i[r_id]

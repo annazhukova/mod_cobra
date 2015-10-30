@@ -154,14 +154,6 @@ class System(object):
         p_id2st = {m_id: b_ms[bm_id2i[m_id]] for m_id in bm_ids if b_ms[bm_id2i[m_id]] > 0}
         return r_id2st, p_id2st
 
-    def get_boundary_metabolite_distribution(self, fm_ids):
-        rs, ps = Counter(), Counter()
-        for fm_id in fm_ids:
-            r2st, p2st = self.get_boundary_inputs_outputs(fm_id)
-            rs.update({it: 1 for it in r2st.iterkeys()})
-            ps.update({it: 1 for it in p2st.iterkeys()})
-        return rs, ps
-
     def lump_coupled_reactions(self):
         coupled_r_id_groups = get_coupled_reactions(self.V, self.r_id2i)
         lr_i = 0

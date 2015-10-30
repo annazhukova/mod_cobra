@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, Counter
 from itertools import chain
 
 import libsbml
@@ -30,16 +30,58 @@ def map_comps(model_id2dfs):
     return [comps for comps in key2comp.itervalues() if len(comps) > 1]
 
 
+def map_chebi_ids(model_id2dfs, chebi):
+    initial_chebi_ids = set()
+    chebi_id2model_ids = defaultdict(set)
+    chebi_id2ancestors = {}
+    ancestor2chebi_ids = defaultdict(set)
+    for model_id, [df, _, _] in model_id2dfs.iteritems():
+        for chebi_id in df["ChEBI"].unique():
+            chebi_id2model_ids[chebi_id].add(model_id)
+            if chebi_id not in initial_chebi_ids:
+                initial_chebi_ids.add(chebi_id)
+                ancestors = {chebi_id}
+                term = chebi.get_term(chebi_id)
+                if term:
+                    ancestors |= {t.get_id()
+                                  for t in chebi.get_generalized_ancestors(term, direct=False,
+                                                                           relationships=EQUIVALENT_RELATIONSHIPS,
+                                                                           depth=4)}
+                    ancestors |= {t.get_id() for t in chebi.get_equivalents(term=term,
+                                                                            relationships=EQUIVALENT_RELATIONSHIPS)}
+                chebi_id2ancestors[chebi_id] = ancestors
+                for ancestor in ancestors:
+                    ancestor2chebi_ids[ancestor].add(chebi_id)
+    ancestor2model_id2count = defaultdict(Counter)
+    for ancestor, chebi_ids in ancestor2chebi_ids.iteritems():
+        for chebi_id in chebi_ids:
+            ancestor2model_id2count[ancestor].update({model_id: 1 for model_id in chebi_id2model_ids[chebi_id]})
+    # keep only terms that cover at most one initial chebi term per model
+    ancestor2count = {ancestor: len(model_id2count)
+                      for (ancestor, model_id2count) in ancestor2model_id2count.iteritems()
+                      if {1} == set(model_id2count.itervalues())}
+
+    available_ancestors = set(ancestor2count.iterkeys())
+    chebi_id2chebi_id = {}
+    for chebi_id in initial_chebi_ids:
+        ancestors = chebi_id2ancestors[chebi_id] & available_ancestors
+        if ancestors:
+            the_ancestor = max(ancestors, key=lambda it: ancestor2count[it])
+            ancestors -= {the_ancestor}
+            available_ancestors -= ancestors
+            chebi_id2chebi_id[chebi_id] = the_ancestor
+
+    return chebi_id2chebi_id
+
+
 def map_metabolites(model_id2dfs, chebi):
+    chebi_id2chebi_id = map_chebi_ids(model_id2dfs, chebi)
     key2ms = defaultdict(lambda: defaultdict(set))
     for model_id, [df, _, _] in model_id2dfs.iteritems():
         for index, row in df.iterrows():
             m_id, name, formula, kegg, chebi_id = row['Id'], row['Name'], row['Formula'], row['KEGG'], row["ChEBI"]
-            if chebi_id:
-                chebi_id = \
-                    min(chain([chebi_id],
-                              (it.get_id() for it in chebi.get_equivalents(term=chebi.get_term(chebi_id),
-                                                                           relationships=EQUIVALENT_RELATIONSHIPS))))
+            if chebi_id and chebi_id in chebi_id2chebi_id:
+                chebi_id = chebi_id2chebi_id[chebi_id]
             key = chebi_id if chebi_id else (kegg if kegg else (formula if formula else name))
             key = key.strip().lower() if key else None
             if key:

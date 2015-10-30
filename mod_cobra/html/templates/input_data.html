@@ -3,8 +3,12 @@
     <p>The analysed model is {{model_name}} (<a href="{{sbml_filepath}}" download>SBML</a>,
         <a href="{{c_csv}}" download>Compartments</a>, <a href="{{m_csv}}" download>Metabolites</a>,
         <a href="{{r_csv}}" download>Reactions</a>).</p>
-    <p>Objective reaction is {{obj_rn}}.</p>
-    {% if in_rn_len > 0 %}
-        <p>Input reaction{% if in_rn_len > 1 %}s are{% else %} is{% endif %} {{in_rns}}.</p>
+    {% if in_rn_len %}
+        <p>Conditions of interest are represented by the reaction{% if in_rn_len > 1 %}s{% endif %}:</p>
+        <ol>
+            {% for in_rn in in_rns %}
+            <li>{{in_rn}}</li>
+            {% endfor %}
+        </ol>
     {% endif %}
 </div>
