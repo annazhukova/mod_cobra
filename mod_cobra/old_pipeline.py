@@ -200,7 +200,7 @@ def visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_l
     doc = libsbml.SBMLReader().readSBML(combined_sbml)
     model = doc.getModel()
     id2mask = get_full_id2mask(id2mask, model)
-    process_sbml(combined_sbml, verbose=True, path='visualization', generalize=False,
+    process_sbml(combined_sbml, verbose=True, web_page_prefix='visualization', generalize=False,
                  id2mask=id2mask, layer2mask=layer2mask, tab2html=tab2html, title=title,
                  id2color=id2color, tabs=None, info=info, invisible_layers=invisible_layers)
 
