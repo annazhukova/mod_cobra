@@ -191,10 +191,10 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
                                            mask_shift, vis_r_ids)
             invisible_layers.append('Pathway community %s' % cl_id)
 
-    visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html)
+    visualize_model(sbml, vis_r_ids, id2mask, id2color, title, invisible_layers, layer2mask, res_dir, tab2html)
 
 
-def visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_layers, layer2mask, res_dir, tab2html):
+def visualize_model(sbml, vis_r_ids, id2mask, id2color, title, invisible_layers, layer2mask, res_dir, tab2html):
     combined_sbml = os.path.join(res_dir, 'Combined_model.xml')
     r_ids2sbml(vis_r_ids, sbml, combined_sbml, 'combined')
     doc = libsbml.SBMLReader().readSBML(combined_sbml)
@@ -202,7 +202,7 @@ def visualize_model(sbml, vis_r_ids, id2mask, id2color, title, info, invisible_l
     id2mask = get_full_id2mask(id2mask, model)
     process_sbml(combined_sbml, verbose=True, web_page_prefix='visualization', generalize=False,
                  id2mask=id2mask, layer2mask=layer2mask, tab2html=tab2html, title=title,
-                 id2color=id2color, tabs=None, info=info, invisible_layers=invisible_layers)
+                 id2color=id2color, tabs=None, invisible_layers=invisible_layers)
 
 
 def update_vis_layers(r_ids, layer, id2mask, layer2mask, mask_shift, vis_r_ids):
