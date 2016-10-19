@@ -17674,7 +17674,7 @@ The results of simulations using the new model corresponded closely with phenoty
       </listOfParameters>
     </kineticLaw>
   </reaction>
-  <reaction metaid="_538728" id="Boundary18" name="L-Glutamine">
+  <reaction metaid="_538728" id="Boundary18" name="L-Glutamine" reversible="false">
     <listOfReactants>
       <speciesReference metaid="_061689" species="C00064_b"/>
     </listOfReactants>
@@ -17686,7 +17686,7 @@ The results of simulations using the new model corresponded closely with phenoty
         <ci> FLUX_VALUE </ci>
       </math>
       <listOfParameters>
-        <parameter metaid="_540796" id="LOWER_BOUND" value="-1000" units="mumol_per_gDW_per_min"/>
+        <parameter metaid="_540796" id="LOWER_BOUND" value="0.01" units="mumol_per_gDW_per_min"/>
         <parameter metaid="_540798" id="UPPER_BOUND" value="0.8" units="mumol_per_gDW_per_min"/>
         <parameter metaid="_540799" id="OBJECTIVE_COEFFICIENT" value="0"/>
         <parameter metaid="_540801" id="FLUX_VALUE" value="0" units="mumol_per_gDW_per_min"/>

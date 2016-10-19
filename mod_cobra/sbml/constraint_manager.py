@@ -13,7 +13,7 @@ def constraint_exchange_reactions(model, forsed_r_id2rev, prohibited_r_id2rev=No
         r_id = r.getId()
         r_l, r_u = get_bounds(r)
 
-        if r_id in forsed_r_id2rev:
+        if forsed_r_id2rev and r_id in forsed_r_id2rev:
             rev = forsed_r_id2rev[r_id]
             if rev:
                 # reverse the reaction and set positive bounds,
@@ -26,7 +26,7 @@ def constraint_exchange_reactions(model, forsed_r_id2rev, prohibited_r_id2rev=No
             r.setReversible(False)
             continue
 
-        if r_id in prohibited_r_id2rev:
+        if prohibited_r_id2rev and r_id in prohibited_r_id2rev:
             rev = prohibited_r_id2rev[r_id]
             if not rev:
                 reverse_reaction(r)
