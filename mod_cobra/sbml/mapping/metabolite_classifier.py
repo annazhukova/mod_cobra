@@ -1,8 +1,8 @@
 from collections import defaultdict
-from annotation.chebi.chebi_annotator import EQUIVALENT_RELATIONSHIPS
+from mod_sbml.annotation.chebi.chebi_annotator import EQUIVALENT_RELATIONSHIPS
 
-from annotation.chebi.chebi_serializer import CHEBI
-from onto import parse
+from mod_sbml.annotation.chebi.chebi_serializer import CHEBI
+from mod_sbml.onto import parse
 
 __author__ = 'anna'
 
