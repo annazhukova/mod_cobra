@@ -10,9 +10,9 @@ __author__ = 'anna'
 def serialize(S, model, in_m_id, out_m_id, model_name, main_dir):
     def format_r(r_id):
         r2st, p2st = S.st_matrix.get_inputs_outputs(r_id)
-        formatter = lambda (m_id, st): '%s %s' % ("" if st == 1 else ("%g" % st),
-                                                  format_m_name(model.getSpecies(m_id), model, show_id=False))
-        rs, ps = sorted(formatter(it) for it in r2st.iteritems()), sorted(formatter(it) for it in p2st.iteritems())
+        formatter = lambda m_id, st: '%s %s' % ("" if st == 1 else ("%g" % st),
+                                                format_m_name(model.getSpecies(m_id), model, show_id=False))
+        rs, ps = sorted(formatter(it) for it in r2st.items()), sorted(formatter(it) for it in p2st.items())
         r = model.getReaction(r_id)
         reversible = r.getReversible() if r else True
 
@@ -24,8 +24,8 @@ def serialize(S, model, in_m_id, out_m_id, model_name, main_dir):
             return 'Yield: %g' % round_value(fm_yield)
         return ''
 
-    r_id2tooltip = {r_id: format_r(r_id) for r_id in S.r_id2i.iterkeys()}
-    p_id2tooltip = {p_id: format_p(p_id) for p_id in S.efm_id2i.iterkeys()}
+    r_id2tooltip = {r_id: format_r(r_id) for r_id in S.r_id2i.keys()}
+    p_id2tooltip = {p_id: format_p(p_id) for p_id in S.efm_id2i.keys()}
 
     efm_id2tr = {}
 

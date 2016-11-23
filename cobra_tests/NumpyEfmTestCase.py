@@ -106,7 +106,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
         N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
-        lr_id = next(r_id2lr_id.itervalues())
+        lr_id = next(r_id2lr_id.values())
         st = N_new[self.s_id2i['m1_b'], new_r_id2i[lr_id]]
         self.assertEqual(-1, st, 'The lumped reaction was supposed to consume 1 m1_b, consumes %g instead' % -st)
 
@@ -115,7 +115,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
         N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
-        lr_id = next(r_id2lr_id.itervalues())
+        lr_id = next(r_id2lr_id.values())
         st = N_new[self.s_id2i['m2_b'], new_r_id2i[lr_id]]
         self.assertEqual(1, st, 'The lumped reaction was supposed to produce 1 m2_b, consumes %g instead' % -st)
 
@@ -124,7 +124,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 1, 'r3': 1, 'r4': 1, 'r6': 1}], self.r_id2i)
         coupled_r_id_groups = get_coupled_reactions(V, self.r_id2i)
         N_new, V_new, new_r_id2i, r_id2lr_id, _ = lump_coupled_reactions(N, V, coupled_r_id_groups, self.r_id2i)
-        lr_id = next(r_id2lr_id.itervalues())
+        lr_id = next(r_id2lr_id.values())
         r_i = V_new[new_r_id2i[lr_id], :]
         self.assertListEqual([10, 1], list(r_i),
                              'The lumped reaction was supposed to participate in EFMs with coefficients [10, 1] not %s'
@@ -299,7 +299,7 @@ class NumpyEfmTestCase(unittest.TestCase):
         N = model2stoichiometric_matrix(self.model, self.s_id2i, self.r_id2i)
         V = get_efm_matrix([{'r1': 10, 'r2': 10, 'r3': 10}, {'r1': 10, 'r3': 10, 'r4': 10, 'r6': 10}], self.r_id2i)
         m = get_boundary_metabolites(N, V[:, 0])
-        result = {(m[self.s_id2i[m_id]], m_id) for m_id in self.s_id2i.iterkeys() if m[self.s_id2i[m_id]]}
+        result = {(m[self.s_id2i[m_id]], m_id) for m_id in self.s_id2i.keys() if m[self.s_id2i[m_id]]}
         self.assertSetEqual({(-1, 'm1_b'), (1, 'm2_b')},
                             result,
                             'Was supposed to get -1 m1_b 1 m2_b as boundary metabolites, got %s' % result)

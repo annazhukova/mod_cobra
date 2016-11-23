@@ -7,13 +7,13 @@
             {% if S.V[S.r_id2i[r_id], S.efm_id2i[efm_id]] %}{{S.V[S.r_id2i[r_id], S.efm_id2i[efm_id]]}}{% endif %}
         </td>
         {% if r_id in S.gr_id2r_id2c %}
-            {% for sub_r_id in S.gr_id2r_id2c[r_id].iterkeys()%}
+            {% for sub_r_id in S.gr_id2r_id2c[r_id].keys()%}
                 <td class="{{sub_r_id}} hidden sub_r sub_{{r_id}}{% if sub_r_id in S.gr_id2r_id2c %} secret subclicable{% endif %}"
                         title="{{sub_r_id}} in {{efm_id}}">
                     {% if S.V[S.r_id2i[sub_r_id], S.efm_id2i[efm_id]] %}{{S.V[S.r_id2i[sub_r_id], S.efm_id2i[efm_id]]}}{% endif %}
                 </td>
                 {% if sub_r_id in S.gr_id2r_id2c %}
-                    {% for sub_sub_r_id in S.gr_id2r_id2c[sub_r_id].iterkeys()%}
+                    {% for sub_sub_r_id in S.gr_id2r_id2c[sub_r_id].keys()%}
                         <td class="{{sub_sub_r_id}} hidden sub_sub_r sub_r sub_{{sub_r_id}}"
                                 title="{{sub_sub_r_id}} in {{efm_id}}">
                             {% if S.V[S.r_id2i[sub_sub_r_id], S.efm_id2i[efm_id]] %}{{S.V[S.r_id2i[sub_sub_r_id], S.efm_id2i[efm_id]]}}{% endif %}

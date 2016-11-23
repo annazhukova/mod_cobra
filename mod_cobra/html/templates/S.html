@@ -5,14 +5,14 @@
         <table border="1">
             <tr>
                 <th></th>
-                {% for r_id in r_id2i.iterkeys() %}
+                {% for r_id in r_id2i.keys() %}
                     <th title="{{r_id2tooltip[r_id]}}">{{r_id}}</th>
                 {% endfor %}
             </tr>
-            {% for (m_id, i) in m_id2i.iteritems() %}
+            {% for (m_id, i) in m_id2i.items() %}
                 <tr>
                     <th title="{{m_id2tooltip[m_id]}}">{{m_id}}</th>
-                    {% for j in r_id2i.itervalues() %}
+                    {% for j in r_id2i.values() %}
                         <td>{% if S[i, j] %}{{S[i, j]}}{% endif %}</td>
                     {% endfor %}
                 </tr>

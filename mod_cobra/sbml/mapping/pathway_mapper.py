@@ -12,8 +12,8 @@ def get_pathways(model, pts, name2pw, root_ids):
     if not pw2r_ids_map:
         pw2r_ids_map = get_subsystem2r_ids(model=model)[0]
     else:
-        pw2r_ids_map = {re.sub('^[A-Za-z]{3}', 'map', pw): r_ids for (pw, r_ids) in pw2r_ids_map.iteritems()}
-    for pw, r_ids in pw2r_ids_map.iteritems():
+        pw2r_ids_map = {re.sub('^[A-Za-z]{3}', 'map', pw): r_ids for (pw, r_ids) in pw2r_ids_map.items()}
+    for pw, r_ids in pw2r_ids_map.items():
             pw = pw.lower().strip()
             # term = None
             term = pts.get_term(pw, check_only_ids=False)
@@ -32,7 +32,7 @@ def get_pathways(model, pts, name2pw, root_ids):
 
 
 def r_ids2pws(r_ids, pw2rs):
-    return {pw for pw, rs in pw2rs.iteritems() if len(r_ids & rs) >= max(2, min(len(r_ids), len(rs)) * 0.25)}
+    return {pw for pw, rs in pw2rs.items() if len(r_ids & rs) >= max(2, min(len(r_ids), len(rs)) * 0.25)}
 
 
 def count_pathways(efm_ids, efm_id2pws):

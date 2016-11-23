@@ -14,9 +14,9 @@ def serialize_fva(model, r_id2bounds, path, objective_sense, out_r_id):
                  r_id2bounds[out_r_id][0])
 
     values2r_ids = defaultdict(set)
-    for r_id, (min_v, max_v) in r_id2bounds.iteritems():
+    for r_id, (min_v, max_v) in r_id2bounds.items():
         values2r_ids[(min_v, max_v)].add(r_id)
-    keys = sorted(values2r_ids.iterkeys(), key=lambda (min_v, max_v): (-abs(max_v - min_v), min_v, max_v))
+    keys = sorted(values2r_ids.keys(), key=lambda (min_v, max_v): (-abs(max_v - min_v), min_v, max_v))
     ess_count, var_count = 0, 0
     with open(path, 'w+') as f:
         if title:

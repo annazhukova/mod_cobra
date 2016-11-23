@@ -30,7 +30,7 @@ setup(name='mod_cobra',
           'Topic :: Software Development :: Libraries :: Python Modules',
       ],
       download_url='https://github.com/annazhukova/mod_cobra',
-      install_requires=['python-libsbml-experimental', 'numpy', 'cobra', 'mod_sbml', 'scipy', 'jinja2', 'igraph',
+      install_requires=['python-libsbml-experimental', 'numpy', 'cobra', 'mod_sbml', 'scipy', 'jinja2', 'jgraph',
                         'louvain', 'mimoza']
       )
 

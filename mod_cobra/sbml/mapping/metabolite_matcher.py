@@ -14,7 +14,7 @@ __author__ = 'anna'
 
 def map_comps(model_id2dfs):
     key2comp = defaultdict(lambda: defaultdict(set))
-    for model_id, [_, _, df] in model_id2dfs.iteritems():
+    for model_id, [_, _, df] in model_id2dfs.items():
         for index, row in df.iterrows():
             c_id, c_name, t_id = row['Id'], row['Name'], row['GO']
             key = t_id if t_id else c_name
@@ -24,10 +24,10 @@ def map_comps(model_id2dfs):
     # if there are models with GO_CYTOPLASM and models with GO_CYTOSOL but none with both,
     # merge GO_CYTOSOL and GO_CYTOPLASM
     if GO_CYTOPLASM in key2comp and GO_CYTOSOL in key2comp \
-            and not set(key2comp[GO_CYTOSOL].iterkeys()) & set(key2comp[GO_CYTOPLASM].iterkeys()):
+            and not set(key2comp[GO_CYTOSOL].keys()) & set(key2comp[GO_CYTOPLASM].keys()):
         key2comp[GO_CYTOPLASM].update(key2comp[GO_CYTOSOL])
         del key2comp[GO_CYTOSOL]
-    return [comps for comps in key2comp.itervalues() if len(comps) > 1]
+    return [comps for comps in key2comp.values() if len(comps) > 1]
 
 
 def map_chebi_ids(model_id2dfs, chebi):
@@ -35,7 +35,7 @@ def map_chebi_ids(model_id2dfs, chebi):
     chebi_id2model_ids = defaultdict(set)
     chebi_id2ancestors = {}
     ancestor2chebi_ids = defaultdict(set)
-    for model_id, [df, _, _] in model_id2dfs.iteritems():
+    for model_id, [df, _, _] in model_id2dfs.items():
         for chebi_id in df["ChEBI"].unique():
             chebi_id2model_ids[chebi_id].add(model_id)
             if chebi_id not in initial_chebi_ids:
@@ -53,15 +53,15 @@ def map_chebi_ids(model_id2dfs, chebi):
                 for ancestor in ancestors:
                     ancestor2chebi_ids[ancestor].add(chebi_id)
     ancestor2model_id2count = defaultdict(Counter)
-    for ancestor, chebi_ids in ancestor2chebi_ids.iteritems():
+    for ancestor, chebi_ids in ancestor2chebi_ids.items():
         for chebi_id in chebi_ids:
             ancestor2model_id2count[ancestor].update({model_id: 1 for model_id in chebi_id2model_ids[chebi_id]})
     # keep only terms that cover at most one initial chebi term per model
     ancestor2count = {ancestor: len(model_id2count)
-                      for (ancestor, model_id2count) in ancestor2model_id2count.iteritems()
-                      if {1} == set(model_id2count.itervalues())}
+                      for (ancestor, model_id2count) in ancestor2model_id2count.items()
+                      if {1} == set(model_id2count.values())}
 
-    available_ancestors = set(ancestor2count.iterkeys())
+    available_ancestors = set(ancestor2count.keys())
     chebi_id2chebi_id = {}
     for chebi_id in initial_chebi_ids:
         ancestors = chebi_id2ancestors[chebi_id] & available_ancestors
@@ -77,7 +77,7 @@ def map_chebi_ids(model_id2dfs, chebi):
 def map_metabolites(model_id2dfs, chebi):
     chebi_id2chebi_id = map_chebi_ids(model_id2dfs, chebi)
     key2ms = defaultdict(lambda: defaultdict(set))
-    for model_id, [df, _, _] in model_id2dfs.iteritems():
+    for model_id, [df, _, _] in model_id2dfs.items():
         for index, row in df.iterrows():
             m_id, name, formula, kegg, chebi_id = row['Id'], row['Name'], row['Formula'], row['KEGG'], row["ChEBI"]
             if chebi_id and chebi_id in chebi_id2chebi_id:
@@ -86,13 +86,13 @@ def map_metabolites(model_id2dfs, chebi):
             key = key.strip().lower() if key else None
             if key:
                 key2ms[key][model_id].add(m_id)
-    return [model_id2m_ids for model_id2m_ids in key2ms.itervalues() if len(model_id2m_ids) > 1]
+    return [model_id2m_ids for model_id2m_ids in key2ms.values() if len(model_id2m_ids) > 1]
 
 
 def get_model_data(model_id2sbml):
     model_id2dfs = {}
 
-    for model_id, sbml in model_id2sbml.iteritems():
+    for model_id, sbml in model_id2sbml.items():
         if isinstance(sbml, libsbml.Model):
             model = sbml
         else:
@@ -112,19 +112,19 @@ def map_metabolites_compartments(model_id2dfs, chebi=None):
 
     model_id2c_id2i = defaultdict(dict)
     for i, model_id2c_ids in enumerate(model_id2c_ids_groups):
-        for model_id, c_ids in model_id2c_ids.iteritems():
+        for model_id, c_ids in model_id2c_ids.items():
             model_id2c_id2i[model_id].update({c_id: i for c_id in c_ids})
 
     model_id2m_ids_same_comp_groups = []
     for model_id2m_ids in model_id2m_ids_groups:
         i2m_ids = defaultdict(list)
-        for model_id, m_ids in model_id2m_ids.iteritems():
+        for model_id, m_ids in model_id2m_ids.items():
             for m_id in m_ids:
                 df, _, _ = model_id2dfs[model_id]
                 c_id = df.at[m_id, 'Compartment']
                 if c_id in model_id2c_id2i[model_id]:
                     i2m_ids[model_id2c_id2i[model_id][c_id]].append((model_id, m_id))
-        for m_ids in i2m_ids.itervalues():
+        for m_ids in i2m_ids.values():
             model_id2m_ids = defaultdict(set)
             if len(m_ids) > 1:
                 for model_id, m_id in m_ids:

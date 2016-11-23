@@ -6,6 +6,10 @@ import shutil
 from cobra.io.sbml import create_cobra_model_from_sbml_file
 import libsbml
 
+from mod_sbml.annotation.kegg.pathway_manager import get_name2pw
+from mod_sbml.annotation.pts.pts_serializer import get_pts
+from mod_sbml.onto import parse_simple
+from mod_sbml.sbml.mapping.pathway_mapper import get_pathways
 from sbml_vis.graph.color.color import get_n_colors
 from mod_cobra.fbva import MAXIMIZE, MINIMIZE
 from mod_cobra.fbva.serialization import fva_serializer, fba_serializer
@@ -51,15 +55,21 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
     if not get_f_path:
         get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir))
 
+    doc = libsbml.SBMLReader().readSBML(sbml)
+    model = doc.getModel()
+
     if in_r_id2rev:
-        sbml = constraint_exchange_reactions(sbml, forsed_r_id2rev=in_r_id2rev)
+        constraint_exchange_reactions(model, forsed_r_id2rev=in_r_id2rev)
+        libsbml.SBMLWriter().writeSBMLToFile(doc, sbml)
 
     # copy our model in the result directory
     if os.path.normpath(res_dir) != os.path.normpath(os.path.dirname(sbml)):
         shutil.copy(sbml, res_dir)
         sbml = os.path.join(res_dir, os.path.basename(sbml))
 
-    description = model_serializer.serialize(sbml, out_r_id, out_rev, in_r_id2rev, res_dir, get_f_path)
+    r_id2rev = dict(in_r_id2rev)
+    r_id2rev[out_r_id] = out_rev
+    description = model_serializer.serialize(sbml, model, model_name, r_id2rev, res_dir, get_f_path)
 
     r_id2mask, layer2mask, vis_r_ids, main_layer = defaultdict(lambda: 0), {}, set(), None
 
@@ -71,7 +81,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
         r_id2bounds, opt_val = analyse_by_fva(cobra_model=cobra_model, bm_r_id=out_r_id,
                                               objective_sense=objective_sense, threshold=threshold)
         if opt_val:
-            mask_shift = update_vis_layers((r_id for (r_id, (l, u)) in r_id2bounds.iteritems() if l * u > 0),
+            mask_shift = update_vis_layers((r_id for (r_id, (l, u)) in r_id2bounds.items() if l * u > 0),
                                            'FVA essential', r_id2mask, layer2mask, mask_shift, vis_r_ids)
             main_layer = 'FVA essential'
             fva_sbml = os.path.join(cur_dir, 'Model_FVA.xml')
@@ -84,20 +94,24 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
         r_id2val, opt_val = analyse_by_fba(cobra_model, bm_r_id=out_r_id, objective_sense=objective_sense,
                                            threshold=threshold)
         if opt_val:
-            mask_shift = update_vis_layers(r_id2val.iterkeys(), 'FBA', r_id2mask, layer2mask, mask_shift, vis_r_ids)
+            mask_shift = update_vis_layers(r_id2val.keys(), 'FBA', r_id2mask, layer2mask, mask_shift, vis_r_ids)
             main_layer = 'FBA'
         description += fba_serializer.serialize(cobra_model, opt_val, r_id2val, objective_sense, out_r_id, cur_dir,
                                                 get_f_path)
 
-    S, r_id2w = None, {}
+    S = None
     if do_efm:
         cur_dir = _prepare_dir(res_dir, 'efma', "Performing EFMA...", rewrite=rewrite)
 
         doc = libsbml.SBMLReader().readSBML(sbml)
         model = doc.getModel()
 
-        S = analyse_model_efm(model, out_r_id, out_rev, cur_dir, in_m_id, out_m_id, in_r_id2rev, tree_efm_path,
-                              threshold, max_efm_number, rewrite=rewrite)
+        name2pw = get_name2pw()
+        pts = parse_simple(get_pts())
+        root_ids = {t.get_id() for t in pts.get_roots()}
+        pw2rs = get_pathways(model, pts, name2pw, root_ids)
+        S, efm_id2pws = analyse_model_efm(model, cur_dir, r_id2rev, tree_efm_path=tree_efm_path,
+                                          max_efm_number=max_efm_number, rewrite=rewrite, pw2rs=pw2rs)
 
         for serializer in (efm_serializer.serialize, coupled_reaction_group_serializer.serialize):
             description += \
@@ -106,11 +120,12 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
 
         if S.gr_id2r_id2c:
             clique_merged_sbml = os.path.join(cur_dir, 'Model_folded.xml')
-            r_id2new_r_id = create_folded_model(S, sbml, clique_merged_sbml)
+            r_id2new_r_id = create_folded_model(S, model)
+            libsbml.SBMLWriter().writeSBMLToFile(doc, clique_merged_sbml)
             sbml = clique_merged_sbml
 
-            vis_r_ids |= {cl_id for (r_id, cl_id) in r_id2new_r_id.iteritems() if r_id in vis_r_ids}
-            for r_id, new_r_id in r_id2new_r_id.iteritems():
+            vis_r_ids |= {cl_id for (r_id, cl_id) in r_id2new_r_id.items() if r_id in vis_r_ids}
+            for r_id, new_r_id in r_id2new_r_id.items():
                 if r_id in r_id2mask:
                     r_id2mask[new_r_id] |= r_id2mask[r_id]
 
@@ -121,7 +136,7 @@ def analyse_model(sbml, out_r_id, out_rev, res_dir, in_m_id, out_m_id, in_r_id2r
 
 
 def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_efm=True, max_efm_number=1000,
-                        rewrite=True):
+                        rewrite=True, treeefm_path=TREEEFM_PATH):
     vis_dir = os.path.join(res_dir, 'visualization')
     create_dirs(vis_dir, rewrite)
     get_f_path = lambda f: os.path.join('..', os.path.relpath(f, res_dir)) if f else None
@@ -130,40 +145,41 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
     model_id2id2mask, model_id2vis_r_ids = {}, {}
     model_id2sbml, model_id2S = {}, {}
 
-    for model_id, (out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id) in sbml2parameters.iteritems():
+    for model_id, (out_r_id, out_rev, in_r_id2rev, in_m_id, out_m_id) in sbml2parameters.items():
         name, model_id2S[name], model_id2sbml[name], model_id2vis_r_ids[name], description, mask_shift, \
         model_id2id2mask[name], cur_layer2mask, main_layer = \
             analyse_model(sbml=model_id, out_r_id=out_r_id, out_rev=out_rev, in_r_id2rev=in_r_id2rev, in_m_id=in_m_id,
                           out_m_id=out_m_id, res_dir=res_dir, do_fva=do_fva, do_fba=do_fba,
                           do_efm=do_efm, mask_shift=mask_shift, get_f_path=get_f_path, max_efm_number=max_efm_number,
-                          main_dir=vis_dir, rewrite=rewrite)
+                          main_dir=vis_dir, rewrite=rewrite, tree_efm_path=treeefm_path)
 
         tab2html['Analysis of %s' % name] = description, None
-        layer2mask.update({'%s: %s' % (name, layer): mask for (layer, mask) in cur_layer2mask.iteritems()})
+        layer2mask.update({'%s: %s' % (name, layer): mask for (layer, mask) in cur_layer2mask.items()})
         invisible_layers.extend(['%s: %s' % (name, layer)
-                                 for layer in cur_layer2mask.iterkeys() if layer != main_layer])
+                                 for layer in cur_layer2mask.keys() if layer != main_layer])
 
     if len(model_id2sbml) > 1:
         mm_dir = os.path.join(res_dir, 'merged_model')
         create_dirs(mm_dir)
 
+        print(model_id2S)
         sbml, S, model_id2id2id, common_ids, model_id2dfs, mappings = combine_models(model_id2sbml, model_id2S, mm_dir)
 
-        tab2html['Model comparison'] = mapping_serializer.serialize(model_id2dfs, mappings, mm_dir, get_f_path), None
+        tab2html['Model comparison'] = mapping_serializer.serialize(model_id2dfs, *mappings, mm_dir, get_f_path), None
         title = 'Combined model analysis'
 
         id2mask = defaultdict(lambda: 0)
         vis_r_ids = set()
-        for model_id in model_id2sbml.iterkeys():
+        for model_id in model_id2sbml.keys():
             id2mask.update({model_id2id2id[model_id][s_id]: id2mask[model_id2id2id[model_id][s_id]] | mask
-                            for (s_id, mask) in model_id2id2mask[model_id].iteritems()
+                            for (s_id, mask) in model_id2id2mask[model_id].items()
                             if s_id in model_id2id2id[model_id]})
             vis_r_ids |= {model_id2id2id[model_id][r_id] for r_id in model_id2vis_r_ids[model_id]
                           if r_id in model_id2id2id[model_id]}
 
         id2color, info = get_colors(common_ids, model_id2id2id, model_id2sbml.keys())
     else:
-        model_id, sbml = next(model_id2sbml.iteritems())
+        model_id, sbml = next(model_id2sbml.items())
         S = model_id2S[model_id].get_main_S()
         vis_r_ids, id2mask, id2color = model_id2vis_r_ids[model_id], model_id2id2mask[model_id], None
         info, title = '', 'Model analysis'
@@ -171,23 +187,23 @@ def multimodel_pipeline(sbml2parameters, res_dir, do_fva=True, do_fba=True, do_e
     # Communities
     comm_dir = _prepare_dir(res_dir, 'communities', "Analysing communities...")
     id2cluster = detect_communities_by_boundary_metabolites(S)
-    id2intersection = {cl_id: S.get_efm_intersection(cluster) for (cl_id, cluster) in id2cluster.iteritems()}
-    # id2imp_rns = {cl_id: {} for (cl_id, cluster) in id2cluster.iteritems()}
-    id2bounds = {cl_id: S.get_boundary_metabolite_distribution(cluster) for (cl_id, cluster) in id2cluster.iteritems()}
-    id2imp_rns = {cl_id: detect_reaction_community(S, cluster, id2intersection[cl_id])
-                  for (cl_id, cluster) in id2cluster.iteritems()}
+    id2intersection = {cl_id: S.get_efm_intersection(cluster) for (cl_id, cluster) in id2cluster.items()}
+    # id2imp_rns = {cl_id: {} for (cl_id, cluster) in id2cluster.items()}
+    # id2bounds = {cl_id: S.get_boundary_metabolite_distribution(cluster) for (cl_id, cluster) in id2cluster.items()}
+    # id2imp_rns = {cl_id: detect_reaction_community(S, cluster, id2intersection[cl_id])
+    #               for (cl_id, cluster) in id2cluster.items()}
     if id2cluster:
         doc = libsbml.SBMLReader().readSBML(sbml)
         model = doc.getModel()
-        description = \
-            community_serializer.serialize(model, S, id2cluster, id2intersection, id2bounds, id2imp_rns,
-                                           comm_dir, get_f_path)
+        description = "Hello!"
+        # description = \
+        #     community_serializer.serialize(model, S, id2cluster, comm_dir, get_f_path, m_id2ch_id, chebi)
         if len(model_id2sbml) > 1:
             tab2html['Model comparison'] = tab2html['Model comparison'][0] + description, None
         else:
             tab2html['Pathway communities'] = description, None
-        for cl_id, r_id2c in id2intersection.iteritems():
-            mask_shift = update_vis_layers(r_id2c.iterkeys(), 'Pathway community %s' % cl_id, id2mask, layer2mask,
+        for cl_id, r_id2c in id2intersection.items():
+            mask_shift = update_vis_layers(r_id2c.keys(), 'Pathway community %s' % cl_id, id2mask, layer2mask,
                                            mask_shift, vis_r_ids)
             invisible_layers.append('Pathway community %s' % cl_id)
 
@@ -220,7 +236,7 @@ def update_vis_layers(r_ids, layer, id2mask, layer2mask, mask_shift, vis_r_ids):
 
 def get_full_id2mask(r_id2mask, model):
     id2mask = defaultdict(lambda: 0)
-    for r_id, mask in r_id2mask.iteritems():
+    for r_id, mask in r_id2mask.items():
         r = model.getReaction(r_id)
         if r:
             id2mask[r_id] |= mask
@@ -240,10 +256,10 @@ def get_colors(common_ids, model_id2id2id, model_ids):
         description = describe('color.html', r=r, g=g, b=b, name='common reactions/metabolites')
     model_id2color = dict(zip(model_ids, colors[1:]))
     id2color = {}
-    for model_id, id2id in model_id2id2id.iteritems():
+    for model_id, id2id in model_id2id2id.items():
         color = model_id2color[model_id]
         r, g, b = color
-        id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.itervalues()})
+        id2color.update({t_id: color if t_id not in common_ids else mixed_color for t_id in id2id.values()})
         description += describe('color.html', r=r, g=g, b=b, name=model_id)
     return id2color, description
 

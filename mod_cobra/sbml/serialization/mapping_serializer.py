@@ -6,7 +6,7 @@ from mod_sbml.serialization.csv_manager import serialize_common_elements_to_csv
 __author__ = 'anna'
 
 
-def serialize(model_id2dfs, (model_id2c_id_groups, model_id2m_id_groups, model_id2r_id_groups), path, get_f_path):
+def serialize(model_id2dfs, model_id2c_id_groups, model_id2m_id_groups, model_id2r_id_groups, path, get_f_path):
     comp_csv, m_csv, r_csv = serialize_common_elements_to_csv(model_id2dfs, model_id2c_id_groups,
                                                               model_id2m_id_groups, model_id2r_id_groups,
                                                               os.path.join(path, 'Model_comparison_')) \

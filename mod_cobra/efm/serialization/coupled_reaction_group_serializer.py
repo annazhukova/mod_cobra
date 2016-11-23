@@ -12,7 +12,7 @@ def serialize_coupled_reaction_groups(model, path, **kwargs):
     coupled_r_ids = S.coupled_rs
     r_types = S.r_types
 
-    initial_efm_ids = [efm_id for efm_id in S.efm_id2i.iterkeys() if efm_id not in S.gr_id2efm_ids]
+    initial_efm_ids = [efm_id for efm_id in S.efm_id2i.keys() if efm_id not in S.gr_id2efm_ids]
 
     def write_coupled_rn_group(cr_id, inverted=False, tab=''):
         r_id2c = S.gr_id2r_id2c[cr_id]
@@ -29,10 +29,10 @@ def serialize_coupled_reaction_groups(model, path, **kwargs):
 
         # types that include coupled reactions
         for rtype_id in sorted((rtype_id for rtype_id in r_types
-                                if set(S.gr_id2r_id2c[rtype_id].iterkeys()) & coupled_r_ids),
+                                if set(S.gr_id2r_id2c[rtype_id].keys()) & coupled_r_ids),
                                key=lambda rtype_id: (-len(S.gr_id2r_id2c[rtype_id]), rtype_id)):
             r_id2c = S.gr_id2r_id2c[rtype_id]
-            cur_r_ids = set(r_id2c.iterkeys())
+            cur_r_ids = set(r_id2c.keys())
             cur_coupled_ids = cur_r_ids & coupled_r_ids
             cur_simple_ids = cur_r_ids - coupled_r_ids
 
@@ -63,13 +63,13 @@ def serialize_coupled_reaction_groups(model, path, **kwargs):
         # non-coupled reaction groups
         f.write(THICK_DELIMITER)
         for rtype_id in sorted((rtype_id for rtype_id in r_types
-                                if not set(S.gr_id2r_id2c[rtype_id].iterkeys()) & coupled_r_ids),
+                                if not set(S.gr_id2r_id2c[rtype_id].keys()) & coupled_r_ids),
                                key=lambda rtype_id: (-len(S.gr_id2r_id2c[rtype_id]), rtype_id)):
             write_inputs_outputs(f, model, S.st_matrix.get_inputs_outputs(rtype_id))
             r_id2c = S.gr_id2r_id2c[rtype_id]
             f.write('Type %s is common to reaction%s %s.\n\n'
                     % (rtype_id, 's' if len(r_id2c) != 1 else '',
-                       ', '.join((('-%s' % r_id) if r_id2c[r_id] < 0 else r_id for r_id in sorted(r_id2c.iterkeys())))))
+                       ', '.join((('-%s' % r_id) if r_id2c[r_id] < 0 else r_id for r_id in sorted(r_id2c.keys())))))
             f.write(THICK_DELIMITER)
     return rgroups_txt, len(coupled_r_ids)
 
@@ -77,7 +77,7 @@ def serialize_coupled_reaction_groups(model, path, **kwargs):
 def serialize_n_longest_coupled_reaction_groups(model, path, **kwargs):
     S = kwargs['S']
     n = kwargs['n'] if 'n' in kwargs else 5
-    initial_efm_ids = [efm_id for efm_id in S.efm_id2i.iterkeys() if efm_id not in S.gr_id2efm_ids]
+    initial_efm_ids = [efm_id for efm_id in S.efm_id2i.keys() if efm_id not in S.gr_id2efm_ids]
     limit = min(n if n is not None and n >= 0 else len(S.coupled_rs), len(S.coupled_rs))
     rg_data = [(cl_id, len(S.gr_id2r_id2c[cl_id]),
                 serialize_coupled_reaction_group(initial_efm_ids, cl_id, S, model, path))

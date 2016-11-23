@@ -12,6 +12,6 @@ def create_fva_model(sbml, r_id2bounds, new_sbml):
         if l_b * u_b >= 0:
             r.setReversible(False)
 
-    r_ids = set(r_id2bounds.iterkeys()) | {format_r_id(r_id, False) for r_id in r_id2bounds.iterkeys()}
+    r_ids = set(r_id2bounds.keys()) | {format_r_id(r_id, False) for r_id in r_id2bounds.keys()}
     r_ids2sbml(r_ids, sbml, new_sbml, 'FVA', r_updater)
     return new_sbml

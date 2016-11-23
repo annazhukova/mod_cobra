@@ -31,9 +31,9 @@ def combine_models(model_id2sbml, model_id2S, path):
 
 def get_r_id_groups(S_merged):
     model_id2r_id_groups = []
-    for r_id2c in S_merged.gr_id2r_id2c.itervalues():
+    for r_id2c in S_merged.gr_id2r_id2c.values():
         model_id2r_ids = defaultdict(set)
-        for (model_id, r_id) in r_id2c.iterkeys():
+        for (model_id, r_id) in r_id2c.keys():
             model_id2r_ids[model_id].add(r_id)
         model_id2r_id_groups.append(model_id2r_ids)
     return model_id2r_id_groups
@@ -41,7 +41,7 @@ def get_r_id_groups(S_merged):
 
 def get_ignored_metabolites(model_id2dfs, ignored_ch_ids):
     ignored_m_ids = set()
-    for model_id, [df, _, _] in model_id2dfs.iteritems():
+    for model_id, [df, _, _] in model_id2dfs.items():
         for index, row in df.iterrows():
             m_id = row['Id']
             t_id = row["ChEBI"] if 'ChEBI' in row else None

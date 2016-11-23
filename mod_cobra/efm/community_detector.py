@@ -11,9 +11,9 @@ __author__ = 'anna'
 
 def detect_communities_by_inputs_of_type(S, superclas, m_id2ch_id, chebi, threshold=75):
     if len(S.efm_id2i) == 1:
-        return {'pc_0': [next(S.efm_id2i.iterkeys())]}
+        return {'pc_0': [next(S.efm_id2i.keys())]}
 
-    fm_ids = list(S.efm_id2i.iterkeys())
+    fm_ids = list(S.efm_id2i.keys())
 
     g = Graph(directed=False)
     g.add_vertices(len(fm_ids))
@@ -49,27 +49,27 @@ def detect_communities_by_inputs_of_type(S, superclas, m_id2ch_id, chebi, thresh
     logging.info("Looking for a partition...")
     partition = find_partition(graph=g, method='Modularity', weight='weight')
     logging.info("Found a partition...")
-    i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.iteritems()}
-    return dict(zip(('pc_%d' % it for it in xrange(0, len(partition))),
+    i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.items()}
+    return dict(zip(('pc_%d' % it for it in range(0, len(partition))),
                     ([i2efm_id[i] for i in cluster] for cluster in partition if len(cluster) > 1)))
 
     # clustering = defaultdict(list)
     # for efm_id in fm_ids:
     #     clustering[get_key(efm_id)].append(efm_id)
     #
-    # return dict(zip(('pc_%d' % it for it in xrange(0, len(clustering))),
+    # return dict(zip(('pc_%d' % it for it in range(0, len(clustering))),
     #                 (cluster for cluster in clustering if len(cluster) > 1)))
 
 
 def detect_communities_by_reactions(S, r_id2w):
     if len(S.efm_id2i) == 1:
-        return {'pc_0': [next(S.efm_id2i.iterkeys())]}
+        return {'pc_0': [next(S.efm_id2i.keys())]}
 
     g = Graph(directed=False)
     g.add_vertices(len(S.efm_id2i))
 
     fm_ids = list(S.efm_ids)
-    fm_id2rs = {fm_id: set(S.pws.get_r_id2coeff(fm_id, binary=True).iteritems()) for fm_id in S.efm_ids}
+    fm_id2rs = {fm_id: set(S.pws.get_r_id2coeff(fm_id, binary=True).items()) for fm_id in S.efm_ids}
     fm_id_pair2count = {}
     i = 1
     for fm_id_1 in fm_ids:
@@ -78,35 +78,35 @@ def detect_communities_by_reactions(S, r_id2w):
             fm_id_pair2count[(fm_id_1, fm_id_2)] = sum(r_id2w[r_id] for r_id, _ in rs & fm_id2rs[fm_id_2])
         i += 1
 
-    avg_intersection = sum(fm_id_pair2count.itervalues()) / len(fm_id_pair2count)
+    avg_intersection = sum(fm_id_pair2count.values()) / len(fm_id_pair2count)
     logging.info("Going to detect communities in FMs, using %d as a threshold." % avg_intersection)
 
-    for (fm_id_1, fm_id_2), w in fm_id_pair2count.iteritems():
+    for (fm_id_1, fm_id_2), w in fm_id_pair2count.items():
         if w >= avg_intersection:
             g.add_edge(S.efm_id2i[fm_id_1], S.efm_id2i[fm_id_2], weight=w - avg_intersection)
 
     logging.info("Looking for a partition...")
     partition = find_partition(graph=g, method='Modularity', weight='weight')
     logging.info("Found a partition...")
-    i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.iteritems()}
-    return dict(zip(('pc_%d' % it for it in xrange(0, len(partition))),
+    i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.items()}
+    return dict(zip(('pc_%d' % it for it in range(0, len(partition))),
                     ([i2efm_id[i] for i in cluster] for cluster in partition)))
 
 
 def detect_communities_by_boundary_metabolites(S, cofactors=None, threshold=50):
     if len(S.efm_id2i) == 1:
-        return {'pc_0': [next(S.efm_id2i.iterkeys())]}
+        return {'pc_0': [next(S.efm_id2i.keys())]}
     if not cofactors:
         cofactors = set()
 
     g = Graph(directed=False)
     g.add_vertices(len(S.efm_id2i))
 
-    fm_ids = list(S.efm_id2i.iterkeys())
+    fm_ids = list(S.efm_id2i.keys())
 
     def get_key(fm_id):
         r2st, p2st = S.get_boundary_inputs_outputs(fm_id)
-        return set(r2st.iterkeys()) - cofactors, set(p2st.iterkeys()) - cofactors
+        return set(r2st.keys()) - cofactors, set(p2st.keys()) - cofactors
 
     fm_id2boundary_ms = {fm_id: get_key(fm_id) for fm_id in fm_ids}
     edges = []
@@ -134,8 +134,8 @@ def detect_communities_by_boundary_metabolites(S, cofactors=None, threshold=50):
     logging.info("Looking for a partition...")
     partition = find_partition(graph=g, method='Modularity', weight='weight')
     logging.info("Found a partition...")
-    i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.iteritems()}
-    return dict(zip(('pc_%d' % it for it in xrange(0, len(partition))),
+    i2efm_id = {i: efm_id for (efm_id, i) in S.efm_id2i.items()}
+    return dict(zip(('pc_%d' % it for it in range(0, len(partition))),
                     ([i2efm_id[i] for i in cluster] for cluster in partition if len(cluster) > 1)))
 
 
@@ -146,7 +146,7 @@ def detect_communities_by_subsystems(efm_ids, id2pws, threshold=50):
     efm_ids = sorted(efm_ids)
 
     # i2efm_id = dict(enumerate(efm_ids))
-    # efm_id2i = {efm_id: i for (i, efm_id) in i2efm_id.iteritems()}
+    # efm_id2i = {efm_id: i for (i, efm_id) in i2efm_id.items()}
 
     # edges = []
     # weights = []
@@ -183,7 +183,7 @@ def detect_communities_by_subsystems(efm_ids, id2pws, threshold=50):
     # partition = find_partition(graph=g, method='Modularity')
     partition = [cluster for cluster in tarjan_iter(graph) if len(cluster) > 1]
     logging.info("Found a partition...")
-    return dict(zip(('sub_pc_%d' % it for it in xrange(0, len(partition))), partition))
+    return dict(zip(('sub_pc_%d' % it for it in range(0, len(partition))), partition))
 
 
 def detect_reaction_community(S, efm_ids, selected_fm):
@@ -235,15 +235,15 @@ def detect_reaction_community(S, efm_ids, selected_fm):
                 value = len(neg_efms_1 & neg_efms_2)
                 if value:
                     r_i_pair2count[S.r_id2i[r_id_1] + len(r_ids), S.r_id2i[r_id_2] + len(r_ids)] = value
-    max_intersection = max(r_i_pair2count.itervalues())
+    max_intersection = max(r_i_pair2count.values())
     if max_intersection == 0:
         return {}
-    avg_intersection = sum(r_i_pair2count.itervalues()) / total_count
+    avg_intersection = sum(r_i_pair2count.values()) / total_count
 
     logging.info("Building the reaction graph, using %d as a threshold." % avg_intersection)
     edges = []
     weights = []
-    for (r_i1, r_i2), w in r_i_pair2count.iteritems():
+    for (r_i1, r_i2), w in r_i_pair2count.items():
         if w > avg_intersection:
             edges.append((r_i1, r_i2))
             weights.append(w - avg_intersection)
@@ -258,10 +258,10 @@ def detect_reaction_community(S, efm_ids, selected_fm):
     partition = find_partition(graph=g, method='Modularity', weight='weight')
 
     if selected_fm:
-        selected_fm_indices = {S.r_id2i[r_id] + (0 if c > 0 else len(S.r_id2i)) for (r_id, c) in selected_fm.iteritems()}
+        selected_fm_indices = {S.r_id2i[r_id] + (0 if c > 0 else len(S.r_id2i)) for (r_id, c) in selected_fm.items()}
         cluster = next(it for it in partition if set(it) & selected_fm_indices)
     else:
         cluster = max(partition, key=lambda it: len(it))
-    i2r_id = {i: (r_id, 1) for (r_id, i) in S.r_id2i.iteritems()}
-    i2r_id.update({len(S.r_id2i) + i: (r_id, -1) for (r_id, i) in S.r_id2i.iteritems()})
+    i2r_id = {i: (r_id, 1) for (r_id, i) in S.r_id2i.items()}
+    i2r_id.update({len(S.r_id2i) + i: (r_id, -1) for (r_id, i) in S.r_id2i.items()})
     return dict(i2r_id[i] for i in cluster)

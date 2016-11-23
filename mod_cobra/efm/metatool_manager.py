@@ -74,7 +74,7 @@ def normalize_id(id_, prefix='s_'):
 
 
 def add_metabolites_to_reaction(r, m_id2st, is_reactant=True, default_c_id=None, m_id2c_id_b=None):
-    for m_id, st in m_id2st.iteritems():
+    for m_id, st in m_id2st.items():
         sr = r.createReactant() if is_reactant else r.createProduct()
         if m_id2c_id_b:
             c_id, b = m_id2c_id_b[m_id]
@@ -112,9 +112,9 @@ def convert_reaction(model, r_id, rev, r_m_id2st, p_m_id2st, default_c_id=None, 
         r.setReversible(rev)
 
         if m_id2c_id_b:
-            comps = Counter([m_id2c_id_b[m_id][0] for m_id in r_m_id2st.iterkeys()
+            comps = Counter([m_id2c_id_b[m_id][0] for m_id in r_m_id2st.keys()
                              if m_id2c_id_b[m_id][0]] +
-                            [m_id2c_id_b[m_id][0] for m_id in p_m_id2st.iterkeys()
+                            [m_id2c_id_b[m_id][0] for m_id in p_m_id2st.keys()
                              if m_id2c_id_b[m_id][0]])
             if comps:
                 default_c_id, _ = comps.most_common(1)[0]
@@ -150,7 +150,7 @@ def convert_dat2sbml(in_dat, out_sbml, c_id2c_name=None, default_c_id=None, abbr
         else:
             c_id2c_name = {'c': "cell"}
             default_c_id = 'c'
-    for c_id, c_name in c_id2c_name.iteritems():
+    for c_id, c_name in c_id2c_name.items():
         c = model.createCompartment()
         c.setId(c_id)
         c.setName(c_name)

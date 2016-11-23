@@ -38,7 +38,7 @@ def compute_efms(model, directory, em_number, tree_efm_path, r_id2rev=None, thre
     # Figure out in which reaction we are interested in
     if not r_id2rev:
         raise ValueError('At least one reaction of interest should be specified')
-    r_id, rev = next(r_id2rev.iteritems())
+    r_id, rev = next(iter(r_id2rev.items()))
     if (rev and r_id not in rev_r_id2i) or (not rev and r_id not in r_id2i):
         raise ValueError("R%seaction with id %s is not found in the model" % ('eversed r' if rev else '', r_id))
     i = rev_r_id2i[r_id] if rev else r_id2i[r_id]
@@ -59,13 +59,13 @@ def compute_efms(model, directory, em_number, tree_efm_path, r_id2rev=None, thre
 
 
 def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, threshold=ZERO_THRESHOLD):
-    i2r_id = {i: (r_id, False) for (r_id, i) in r_id2i.iteritems()}
-    i2r_id.update({i: (r_id, True) for (r_id, i) in rev_r_id2i.iteritems()})
+    i2r_id = {i: (r_id, False) for (r_id, i) in r_id2i.items()}
+    i2r_id.update({i: (r_id, True) for (r_id, i) in rev_r_id2i.items()})
     efms = []
     rejected_bad, rejected_different = 0, 0
 
     get_key = lambda r_id2coeff: \
-        tuple(sorted(((r_id, coefficient_to_binary(coeff)) for (r_id, coeff) in r_id2coeff.iteritems())))
+        tuple(sorted(((r_id, coefficient_to_binary(coeff)) for (r_id, coeff) in r_id2coeff.items())))
     processed = set()
     with open(out_path, 'w+') as out_f:
         with open(in_path, 'r') as in_f:
@@ -92,7 +92,7 @@ def filter_efms(in_path, r_id2i, rev_r_id2i, out_path, r_id2rev=None, threshold=
                     continue
 
                 if r_id2rev:
-                    for (r_id, rev) in r_id2rev.iteritems():
+                    for (r_id, rev) in r_id2rev.items():
                         if r_id not in r_id2coefficient or (rev is not None and rev != (r_id2coefficient[r_id] < 0)):
                             rejected_different += 1
                             bad_em = True
@@ -124,7 +124,7 @@ def stoichiometric_matrix(model, path):
     reactions id to its indices; reversible reaction id to its index (for the opposite direction).
     """
     internal_s_ids = [s.id for s in model.getListOfSpecies() if not s.getBoundaryCondition()]
-    m_id2i = dict(zip(internal_s_ids, xrange(1, len(internal_s_ids) + 1)))
+    m_id2i = dict(zip(internal_s_ids, range(1, len(internal_s_ids) + 1)))
     r_id2i, rev_r_id2i = {}, {}
 
     def add_reaction_data(f, reaction_number, reaction, rev=False):

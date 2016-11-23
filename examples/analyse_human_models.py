@@ -2,7 +2,7 @@ import logging
 import os
 
 from mod_cobra.analysis_pipeline import multimodel_pipeline
-from models import SR_MODEL_SER, SR_GLN_EXCHANGE, SR_SER_PRODUCTION, \
+from examples.models import SR_MODEL_SER, SR_GLN_EXCHANGE, SR_SER_PRODUCTION, \
     RECON_MODEL_BOUNDARY, RECON_GLN_EXCHANGE, RECON_SER_PRODUCTION, \
     UHLEN_MODEL, UH_GLN_IN, UH_SER_PRODUCTION, \
     DATA_DIR, RECON_GLC_EXCHANGE, SR_GLC_EXCHANGE, UH_GLC_IN

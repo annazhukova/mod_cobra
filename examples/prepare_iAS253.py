@@ -181,7 +181,7 @@ def add_recon_reactions(sr_model, r_model, recon_r_ids_to_add, metabolite_id_map
         m_id_recon2sr.update(metabolite_id_mapping_recon2sr)
 
     if recon_m_id2boundary_condition_to_add:
-        for recon_m_id in recon_m_id2boundary_condition_to_add.iterkeys():
+        for recon_m_id in recon_m_id2boundary_condition_to_add.keys():
             df = model_id2dfs[RECON2_ID][0]
             row = df.loc[recon_m_id]
             kegg_id = row['KEGG']

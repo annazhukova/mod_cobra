@@ -1,4 +1,6 @@
 from collections import defaultdict
+from functools import reduce
+
 from mod_sbml.annotation.chebi.chebi_annotator import EQUIVALENT_RELATIONSHIPS
 
 from mod_sbml.annotation.chebi.chebi_serializer import CHEBI
@@ -29,4 +31,4 @@ def classify_m_ids(m_ids, m_id2chebi_id,
     t2chebi_ids = {t: {it.get_id() for it in chebi.get_sub_tree(t, relationships=EQUIVALENT_RELATIONSHIPS) & terms}
                    for t in (chebi.get_term(t_id) for t_id in chebi_classes)}
     return {t.get_name(): reduce(lambda s1, s2: s1 | s2, (chebi_id2m_ids[ch_id] for ch_id in ch_ids), set())
-            for (t, ch_ids) in t2chebi_ids.iteritems() if ch_ids}
+            for (t, ch_ids) in t2chebi_ids.items() if ch_ids}

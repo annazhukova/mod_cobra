@@ -14,11 +14,11 @@ def coefficient_to_string(c, binary=False):
     return '%g ' % c
 
 
-def r_id2c_to_string(r_id2c, binary=False, get_key=lambda r_id: (0, (None, 0), (None, 0), r_id), hidden_r_ids=None):
+def r_id2c_to_string(r_id2c, binary=False, get_key=lambda r_id: (0, ('', 0), ('', 0), r_id), hidden_r_ids=None):
     result = []
     clique_started = None
     started = False
-    for r_id in sorted(r_id2c.iterkeys(), key=lambda r_id: get_key(r_id), reverse=True):
+    for r_id in sorted(r_id2c.keys(), key=lambda r_id: get_key(r_id), reverse=True):
         coefficient = r_id2c[r_id]
         _, (group, gc), (clique, cc), _ = get_key(r_id)
         if clique != clique_started:
@@ -48,7 +48,7 @@ def r_id2c_to_string(r_id2c, binary=False, get_key=lambda r_id: (0, (None, 0), (
 
 def write_detailed_r_id2c(model, r_id2c, f):
     c2r_ids = invert_map(r_id2c)
-    for c, r_ids in sorted(c2r_ids.iteritems(), key=lambda (c, _): (-abs(c), -c)):
+    for c, r_ids in sorted(c2r_ids.items(), key=lambda it: (-abs(it[0]), -it[0])):
         for r_id in sorted(r_ids):
             f.write('%g\t%s:\t%s\n'
                     % (c, r_id, get_sbml_r_formula(model, model.getReaction(r_id), show_compartments=False,
@@ -58,14 +58,15 @@ def write_detailed_r_id2c(model, r_id2c, f):
 
 def write_metabolites(m_id2st, model, f, prefix=''):
     f.write('%s%s;\n\n' % (prefix, ', '.join('%g %s (%s)' % (st, model.getSpecies(m_id).getName(), m_id)
-                                             for (m_id, st) in sorted(m_id2st.iteritems(), key=lambda (m_id, _): m_id))))
+                                             for (m_id, st) in sorted(m_id2st.items(), key=lambda it: it[0]))))
 
 
-def write_inputs_outputs(f, model, (r_id2st, p_id2st), in_m_id=None):
+def write_inputs_outputs(f, model, inputs, in_m_id=None):
+    (r_id2st, p_id2st) = inputs
     if in_m_id and in_m_id in r_id2st:
         c = r_id2st[in_m_id]
         if c:
-            r_id2st = {m_id: 1.0 * st / c for (m_id, st) in r_id2st.iteritems()}
-            p_id2st = {m_id: 1.0 * st / c for (m_id, st) in p_id2st.iteritems()}
+            r_id2st = {m_id: 1.0 * st / c for (m_id, st) in r_id2st.items()}
+            p_id2st = {m_id: 1.0 * st / c for (m_id, st) in p_id2st.items()}
     write_metabolites(r_id2st, model, f, prefix='Inputs: ')
     write_metabolites(p_id2st, model, f, prefix='Outputs: ')

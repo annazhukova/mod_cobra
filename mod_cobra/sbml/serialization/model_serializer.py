@@ -1,9 +1,9 @@
 import logging
 import os
-import libsbml
+
 from mod_cobra.html import describe
-from mod_sbml.serialization.csv_manager import serialize_model_info
 from mod_sbml.serialization import get_sbml_r_formula
+from mod_sbml.serialization.csv_manager import serialize_model_info
 
 __author__ = 'anna'
 
@@ -20,4 +20,4 @@ def serialize(sbml, model, m_name, r_id2rev, path, get_f_path):
                     c_csv=get_f_path(c_csv), m_csv=get_f_path(m_csv), r_csv=get_f_path(r_csv),
                     in_rn_len=len(r_id2rev),
                     in_rns=[r_string(model.getReaction(r_id), rev)
-                            for (r_id, rev) in r_id2rev.iteritems()] if r_id2rev else [])
+                            for (r_id, rev) in r_id2rev.items()] if r_id2rev else [])

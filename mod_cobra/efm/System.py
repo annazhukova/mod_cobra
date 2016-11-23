@@ -19,8 +19,8 @@ class StoichiometricMatrix(object):
 
     def get_inputs_outputs(self, r_id):
         ms = self.N[:, self.r_id2i[r_id]]
-        return {m_id: -ms[i] for (m_id, i) in self.m_id2i.iteritems() if ms[i] < 0},\
-               {m_id: ms[i] for (m_id, i) in self.m_id2i.iteritems() if ms[i] > 0}
+        return {m_id: -ms[i] for (m_id, i) in self.m_id2i.items() if ms[i] < 0},\
+               {m_id: ms[i] for (m_id, i) in self.m_id2i.items() if ms[i] > 0}
 
 
 class PathwaySet(object):
@@ -33,7 +33,7 @@ class PathwaySet(object):
 
     def get_r_id2coeff(self, efm_id, binary=False, r_ids=None):
         if not r_ids:
-            r_ids = self.r_id2i.iterkeys()
+            r_ids = self.r_id2i.keys()
         if binary:
             return {r_id: coefficient_to_binary(self.V[self.r_id2i[r_id], self.efm_id2i[efm_id]]) for r_id in r_ids
                     if self.V[self.r_id2i[r_id], self.efm_id2i[efm_id]]}
@@ -42,7 +42,7 @@ class PathwaySet(object):
 
     def get_efm_ids(self, r_id, reversed=False, efm_ids=None):
         if not efm_ids:
-            efm_ids = self.efm_id2i.iterkeys()
+            efm_ids = self.efm_id2i.keys()
         check = lambda it: (it < 0) if reversed else (it > 0)
         return {efm_id for efm_id in efm_ids if check(self.V[self.r_id2i[r_id], self.efm_id2i[efm_id]])}
 
@@ -70,9 +70,9 @@ class System(object):
         if V is not None and r_id2i is not None:
             self.pws = PathwaySet(V, r_id2i, efm_id2i)
 
-        self.r_ids = set(r_ids) if r_ids else set(self.r_id2i.iterkeys())
-        self.m_ids = set(m_ids) if m_ids else set(self.m_id2i.iterkeys())
-        self.efm_ids = set(efm_ids) if efm_ids else set(self.efm_id2i.iterkeys())
+        self.r_ids = set(r_ids) if r_ids else set(self.r_id2i.keys())
+        self.m_ids = set(m_ids) if m_ids else set(self.m_id2i.keys())
+        self.efm_ids = set(efm_ids) if efm_ids else set(self.efm_id2i.keys())
 
         self.r_id2gr_id = r_id2gr_id if r_id2gr_id else {}
         self.gr_id2r_id2c = gr_id2r_id2c if gr_id2r_id2c else {}
@@ -132,7 +132,7 @@ class System(object):
 
     def get_efm_ids_by_r_id(self, r_id, efm_ids=None):
         if not efm_ids:
-            efm_ids = self.efm_id2i.iterkeys()
+            efm_ids = self.efm_id2i.keys()
         return [efm_id for efm_id in efm_ids if self.V[self.r_id2i[r_id], self.efm_id2i[efm_id]]]
 
     def get_len(self, efm_id, r_ids=None):
@@ -148,7 +148,7 @@ class System(object):
         v = self.V[r_is, self.efm_id2i[pathway_id]]
         bm_ids = sorted(set(self.boundary_m_ids) & self.m_ids)
         b_ms = get_boundary_metabolites(self.N[[self.m_id2i[m_id] for m_id in bm_ids], :][:, r_is], v)
-        bm_id2i = dict(zip(bm_ids, xrange(0, len(bm_ids))))
+        bm_id2i = dict(zip(bm_ids, range(0, len(bm_ids))))
         # b_ms = get_boundary_metabolites(self.N, v)
         r_id2st = {m_id: -b_ms[bm_id2i[m_id]] for m_id in bm_ids if b_ms[bm_id2i[m_id]] < 0}
         p_id2st = {m_id: b_ms[bm_id2i[m_id]] for m_id in bm_ids if b_ms[bm_id2i[m_id]] > 0}
@@ -252,12 +252,12 @@ class System(object):
             self.r_ids.add(grouped_r_id)
 
     def remove_unused_metabolites(self):
-        self.m_ids = {m_id for (m_id, i) in self.m_id2i.iteritems()
+        self.m_ids = {m_id for (m_id, i) in self.m_id2i.items()
                       if get_len(self.N[i, [self.r_id2i[r_id] for r_id in self.r_ids]])}
 
     def get_used_system(self):
-        m_ids = {m_id for (m_id, i) in self.m_id2i.iteritems() if get_len(self.N[i, :])}
-        r_ids = {r_id for (r_id, i) in self.r_id2i.iteritems() if get_len(self.V[i, :])}
+        m_ids = {m_id for (m_id, i) in self.m_id2i.items() if get_len(self.N[i, :])}
+        r_ids = {r_id for (r_id, i) in self.r_id2i.items() if get_len(self.V[i, :])}
         r_id2i = {r_id: i for (i, r_id) in enumerate(r_ids)}
         m_id2i = {m_id: i for (i, m_id) in enumerate(m_ids)}
         efm_id2i = self.efm_id2i
@@ -294,8 +294,8 @@ class System(object):
             r_id2i = self.get_main_r_id2i()
         if not efm_id2i:
             efm_id2i = self.get_main_efm_id2i()
-        r_is = [self.r_id2i[r_id] for r_id in sorted(r_id2i.iterkeys(), key=lambda r_id: r_id2i[r_id])]
-        efm_is = [self.efm_id2i[efm_id] for efm_id in sorted(efm_id2i.iterkeys(), key=lambda efm_id: efm_id2i[efm_id])]
+        r_is = [self.r_id2i[r_id] for r_id in sorted(r_id2i.keys(), key=lambda r_id: r_id2i[r_id])]
+        efm_is = [self.efm_id2i[efm_id] for efm_id in sorted(efm_id2i.keys(), key=lambda efm_id: efm_id2i[efm_id])]
         return self.V[r_is, :][:, efm_is]
 
     def get_main_N(self, r_id2i=None, m_id2i=None):
@@ -303,8 +303,8 @@ class System(object):
             r_id2i = self.get_main_r_id2i()
         if not m_id2i:
             m_id2i = self.get_main_m_id2i()
-        r_is = [self.r_id2i[r_id] for r_id in sorted(r_id2i.iterkeys(), key=lambda r_id: r_id2i[r_id])]
-        m_is = [self.m_id2i[m_id] for m_id in sorted(m_id2i.iterkeys(), key=lambda m_id: m_id2i[m_id])]
+        r_is = [self.r_id2i[r_id] for r_id in sorted(r_id2i.keys(), key=lambda r_id: r_id2i[r_id])]
+        m_is = [self.m_id2i[m_id] for m_id in sorted(m_id2i.keys(), key=lambda m_id: m_id2i[m_id])]
         return self.N[:, r_is][m_is, :]
 
     def get_main_S(self):

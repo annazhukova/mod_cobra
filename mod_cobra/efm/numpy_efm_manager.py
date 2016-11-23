@@ -1,4 +1,5 @@
 from collections import defaultdict
+from functools import reduce
 from itertools import chain
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -13,8 +14,8 @@ __author__ = 'anna'
 def get_element2id_mapping(model):
     s_id2i = dict(zip((s.getId() for s in sorted(model.getListOfSpecies(),
                                                  key=lambda s: 1 if s.getBoundaryCondition() else 0)),
-                      xrange(0, model.getNumSpecies())))
-    r_id2i = dict(zip((r.getId() for r in model.getListOfReactions()), xrange(0, model.getNumReactions())))
+                      range(0, model.getNumSpecies())))
+    r_id2i = dict(zip((r.getId() for r in model.getListOfReactions()), range(0, model.getNumReactions())))
     return s_id2i, r_id2i
 
 
@@ -22,8 +23,8 @@ def get_efm_matrix(r_id2coefficient_list, r_id2i):
     rows, cols, data = [], [], []
     for efm_id, r_id2coef in enumerate(r_id2coefficient_list):
         cols.extend([efm_id] * len(r_id2coef))
-        rows.extend((r_id2i[r_id] for r_id in r_id2coef.iterkeys()))
-        data.extend(r_id2coef.itervalues())
+        rows.extend((r_id2i[r_id] for r_id in r_id2coef.keys()))
+        data.extend(r_id2coef.values())
     V = csr_matrix((np.array(data), (np.array(rows), np.array(cols))),
                    shape=(len(r_id2i), len(r_id2coefficient_list))).toarray()
     replace_zeros(V)
@@ -32,7 +33,7 @@ def get_efm_matrix(r_id2coefficient_list, r_id2i):
 
 def remove_invalid_efms(N, V, threshold=ZERO_THRESHOLD):
     bm = np.dot(N, V)
-    return V[:, [i for i in xrange(0, bm.shape[1]) if not next((it for it in bm[:, i] if abs(it) > threshold), False)]]
+    return V[:, [i for i in range(0, bm.shape[1]) if not next((it for it in bm[:, i] if abs(it) > threshold), False)]]
     # return np.array([v for v in V.T if np.count_nonzero(np.dot(N, v.T)) == 0]).T
 
 
@@ -74,9 +75,9 @@ def replace_zeros(array, threshold=ZERO_THRESHOLD):
 
 def lump_coupled_reactions(N, V, coupled_r_id_groups, r_id2i):
     coupled_r_ids = reduce(lambda s1, s2: s1 | set(s2), coupled_r_id_groups, set())
-    ordered_r_ids = [r_id for r_id in sorted(r_id2i.iterkeys(), key=lambda r_id: r_id2i[r_id])
+    ordered_r_ids = [r_id for r_id in sorted(r_id2i.keys(), key=lambda r_id: r_id2i[r_id])
                      if r_id not in coupled_r_ids]
-    new_r_id2i = dict(zip(ordered_r_ids, xrange(0, len(ordered_r_ids))))
+    new_r_id2i = dict(zip(ordered_r_ids, range(0, len(ordered_r_ids))))
     indices = tuple((r_id2i[r_id] for r_id in ordered_r_ids))
     N_new = N[:, indices]
     V_new = V[indices, :]
@@ -108,9 +109,9 @@ def get_reaction_duplicates(N, r_id2i):
 
 def remove_reaction_duplicates(N, V, r_id_groups, r_id2i):
     grouped_r_ids = reduce(lambda s1, s2: s1 | set(s2), r_id_groups, set())
-    ordered_r_ids = [r_id for r_id in r_id2i.iterkeys() if r_id not in grouped_r_ids]
+    ordered_r_ids = [r_id for r_id in r_id2i.keys() if r_id not in grouped_r_ids]
     r_id2gr_id = {}
-    new_r_id2i = dict(zip(ordered_r_ids, xrange(0, len(ordered_r_ids))))
+    new_r_id2i = dict(zip(ordered_r_ids, range(0, len(ordered_r_ids))))
     indices = tuple((r_id2i[r_id] for r_id in ordered_r_ids))
     N_new = N[:, indices]
     V_new = V[indices, :]
@@ -142,9 +143,9 @@ def get_efm_duplicates(V, efm_id2i):
 
 def remove_efm_duplicates(V, efm_id_groups, efm_id2i):
     grouped_efm_ids = reduce(lambda s1, s2: s1 | set(s2), efm_id_groups, set())
-    ordered_efm_ids = [efm_id for efm_id in efm_id2i.iterkeys() if efm_id not in grouped_efm_ids]
+    ordered_efm_ids = [efm_id for efm_id in efm_id2i.keys() if efm_id not in grouped_efm_ids]
     efm_id2gr_id = {}
-    new_efm_id2i = dict(zip(ordered_efm_ids, xrange(0, len(ordered_efm_ids))))
+    new_efm_id2i = dict(zip(ordered_efm_ids, range(0, len(ordered_efm_ids))))
     indices = tuple((efm_id2i[efm_id] for efm_id in ordered_efm_ids))
     V_new = V[:, indices]
     gr_i = 0
@@ -199,16 +200,16 @@ def get_2_efm_intersection(sign_V, efm_i1, efm_i2, i2r_id):
 
 def get_efm_groups_based_on_boundary_metabolites(N, V, efm_id2i):
     key2efm_ids = defaultdict(list)
-    for efm_id, i in efm_id2i.iteritems():
+    for efm_id, i in efm_id2i.items():
         key2efm_ids[tuple(get_boundary_metabolites(N, V[:, i]))].append(efm_id)
-    return [e_ids for e_ids in key2efm_ids.itervalues() if len(e_ids) > 1]
+    return [e_ids for e_ids in key2efm_ids.values() if len(e_ids) > 1]
 
 
 def merge_efm_groups(V, efm_id_groups, efm_id2i):
     grouped_efm_ids = reduce(lambda s1, s2: s1 | set(s2), efm_id_groups, set())
-    ordered_efm_ids = [efm_id for efm_id in efm_id2i.iterkeys() if efm_id not in grouped_efm_ids]
+    ordered_efm_ids = [efm_id for efm_id in efm_id2i.keys() if efm_id not in grouped_efm_ids]
     efm_id2gr_id = {}
-    new_efm_id2i = dict(zip(ordered_efm_ids, xrange(0, len(ordered_efm_ids))))
+    new_efm_id2i = dict(zip(ordered_efm_ids, range(0, len(ordered_efm_ids))))
     indices = tuple((efm_id2i[efm_id] for efm_id in ordered_efm_ids))
     V_new = V[:, indices]
     gr_i = 0
@@ -234,12 +235,12 @@ def get_equivalent_rows(M, e_id2i, axis=0, consider_sign=False, threshold=ZERO_T
     :return: list of groups of ids of equivalent elements
     """
     key2e_ids = defaultdict(list)
-    for e_id, i in e_id2i.iteritems():
+    for e_id, i in e_id2i.items():
         e_i = M[i, :] if 0 == axis else M[:, i]
         replace_zeros(e_i, threshold)
         if np.count_nonzero(e_i) <= 1:
             continue
         coeff = e_i[np.nonzero(e_i)[0][0]] * 1.0
         key2e_ids[(tuple(e_i / coeff), (coeff > 0) if consider_sign else True)].append(e_id)
-    return [e_ids for e_ids in key2e_ids.itervalues() if len(e_ids) > 1]
+    return [e_ids for e_ids in key2e_ids.values() if len(e_ids) > 1]
 

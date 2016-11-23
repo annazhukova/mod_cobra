@@ -51,7 +51,7 @@ def optimise_biomass(model, bm_id, objective_sense=MAXIMIZE, level=logging.INFO)
 
 def get_fluxes_larger_than_threshold(model, threshold=0):
     r_id2val = {}
-    for r_id, value in model.solution.x_dict.iteritems():
+    for r_id, value in model.solution.x_dict.items():
         value = round_value(value)
         if threshold is None or abs(value) > threshold:
             r_id2val[r_id] = value
@@ -61,7 +61,7 @@ def get_fluxes_larger_than_threshold(model, threshold=0):
 def get_r_id2fva_bounds(model, threshold=None, rs=None):
     r_id2min_max = flux_variability_analysis(model, reaction_list=rs)
     r_id2bounds = {}
-    for r_id, values in r_id2min_max.iteritems():
+    for r_id, values in r_id2min_max.items():
         min_v, max_v = round_value(values['minimum']), round_value(values['maximum'])
         if threshold is None or abs(min_v) > threshold or abs(max_v) > threshold:
             r_id2bounds[r_id] = min_v, max_v

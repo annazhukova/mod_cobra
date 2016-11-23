@@ -52,7 +52,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, treeefm_path, max_efm_number=1
     model_id2cofactors = {}
     modeld_id2m_id2chebi_id = {}
 
-    for sbml, (r_id2rev, r_id2rev_banned) in sbml2parameters.iteritems():
+    for sbml, (r_id2rev, r_id2rev_banned) in sbml2parameters.items():
         doc = libsbml.SBMLReader().readSBML(sbml)
         model = doc.getModel()
 
@@ -117,7 +117,7 @@ def multimodel_pipeline(sbml2parameters, res_dir, treeefm_path, max_efm_number=1
         model_id2cofactors[safe_m_name] = cofactors
         modeld_id2m_id2chebi_id[safe_m_name] = m_id2ch_id
 
-        tab2html['Analysis of %s' % short_model_name.decode('utf-8')] = description, None
+        tab2html['Analysis of %s' % short_model_name] = description, None
 
     cofactors = set()
     m_id2ch_id = {}
@@ -127,26 +127,25 @@ def multimodel_pipeline(sbml2parameters, res_dir, treeefm_path, max_efm_number=1
 
         sbml, S, model_id2id2id, common_ids, model_id2dfs, mappings = combine_models(model_id2sbml, model_id2S, mm_dir)
 
-        for model_id in model_id2sbml.iterkeys():
+        for model_id in model_id2sbml.keys():
             efm_id2pws.update({model_id2id2id[model_id][efm_id]: pws
-                               for (efm_id, pws) in model_id2efm_id2pws[model_id].iteritems()
+                               for (efm_id, pws) in model_id2efm_id2pws[model_id].items()
                                if efm_id in model_id2id2id[model_id]})
             cofactors |= {model_id2id2id[model_id][m_id] for m_id in model_id2cofactors[model_id]
                           if m_id in model_id2id2id[model_id]}
             m_id2ch_id.update({model_id2id2id[model_id][m_id]: ch_id
-                               for (m_id, ch_id) in modeld_id2m_id2chebi_id[model_id].iteritems()
+                               for (m_id, ch_id) in modeld_id2m_id2chebi_id[model_id].items()
                                if m_id in model_id2id2id[model_id]})
 
-        tab2html['Model comparison'] = mapping_serializer.serialize(model_id2dfs, mappings, mm_dir, get_f_path), None
+        tab2html['Model comparison'] = mapping_serializer.serialize(model_id2dfs, *mappings, mm_dir, get_f_path), None
         title = 'Combined model analysis'
     else:
-        model_id, sbml = next(model_id2sbml.iteritems())
+        model_id, sbml = next(model_id2sbml.items())
         efm_id2pws = model_id2efm_id2pws[model_id]
         cofactors = model_id2cofactors[model_id]
         m_id2ch_id = modeld_id2m_id2chebi_id[model_id]
         S = model_id2S[model_id].get_main_S()
         info, title, id2color = '', 'Model analysis', None
-
 
     # Communities
     logging.info("Analysing communities...")
@@ -176,6 +175,8 @@ def serialize(res_dir, tab2html, title):
     copytree(os.path.join(os.path.dirname(os.path.abspath(sbml_vis.__file__)), '..', 'lib'),
              lib_dir)
     env = Environment(loader=PackageLoader('sbml_vis.html', 'templates'))
+    # Make sure that visualisation goes first
+    tab2html = sorted(tab2html.items(), key=lambda it: (2, it[0]) if it[0] != 'Visualization' else (1, it[0]))
     template = env.get_template('tabbed_page.html')
     page = template.render(css_list=[], js_list=[], title=title, tab2html=tab2html)
     with io.open(os.path.join(res_dir, 'visualisation', 'index.html'), 'w+', encoding='utf-8') as f:

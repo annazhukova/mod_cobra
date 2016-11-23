@@ -10,8 +10,8 @@ __author__ = 'anna'
 
 
 def serialize_n_shortest_efms(model, path, S, n=3):
-    initial_efm_ids = {efm_id for efm_id in S.efm_id2i.iterkeys() if efm_id not in S.gr_id2efm_ids}
-    initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
+    initial_efm_ids = {efm_id for efm_id in S.efm_id2i.keys() if efm_id not in S.gr_id2efm_ids}
+    initial_r_ids = {r_id for r_id in S.r_id2i.keys() if r_id not in S.gr_id2r_id2c}
     limit = min(n if n is not None and n >= 0 else len(S.efm_id2i), len(S.efm_id2i))
     efm_data = [(efm_id, S.get_len(efm_id, r_ids=initial_r_ids),
                  serialize_efm(S, efm_id, model, path))
@@ -22,7 +22,7 @@ def serialize_n_shortest_efms(model, path, S, n=3):
 
 def serialize_efm(S, efm_id, model, path):
     efm_txt = os.path.join(path, '%s.txt' % efm_id)
-    initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
+    initial_r_ids = {r_id for r_id in S.r_id2i.keys() if r_id not in S.gr_id2r_id2c}
     r_id2c = S.pws.get_r_id2coeff(efm_id, r_ids=initial_r_ids)
     with open(efm_txt, 'w+') as f:
         f.write('EFM %s of length %d\n\n' % (efm_id, len(r_id2c)))
@@ -33,14 +33,14 @@ def serialize_efm(S, efm_id, model, path):
 
 
 def serialize_efms(model, path, S):
-    initial_efm_ids = {efm_id for efm_id in S.efm_id2i.iterkeys() if efm_id not in S.gr_id2efm_ids}
-    initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
+    initial_efm_ids = {efm_id for efm_id in S.efm_id2i.keys() if efm_id not in S.gr_id2efm_ids}
+    initial_r_ids = {r_id for r_id in S.r_id2i.keys() if r_id not in S.gr_id2r_id2c}
     all_fm_intersection = S.get_efm_intersection(initial_efm_ids, r_ids=initial_r_ids)
     all_fm_intersection_folded = S.get_efm_intersection(initial_efm_ids)
 
     def get_key(r_id):
-        mr_id, mc = None, 0
-        gr_id, gc = None, 0
+        mr_id, mc = '', 0
+        gr_id, gc = '', 0
         if r_id in S.r_id2gr_id:
             gr_id = S.r_id2gr_id[r_id]
             gc = S.gr_id2r_id2c[gr_id][r_id]
@@ -112,7 +112,7 @@ def write_folded_efm(f_efm_id, S, get_key, f, tab=''):
 
 
 def write_efm(efm_id, S, get_key, f, tab='', no_first_tab=False):
-    initial_r_ids = {r_id for r_id in S.r_id2i.iterkeys() if r_id not in S.gr_id2r_id2c}
+    initial_r_ids = {r_id for r_id in S.r_id2i.keys() if r_id not in S.gr_id2r_id2c}
     f.write('%s%s of length %d:\n\n%s\t%s\n\n'
             % ('' if no_first_tab else tab, efm_id, S.get_len(efm_id, r_ids=initial_r_ids),
                tab, r_id2c_to_string(S.pws.get_r_id2coeff(efm_id, r_ids=initial_r_ids), get_key=get_key)))
